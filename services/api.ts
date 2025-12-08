@@ -1,10 +1,9 @@
 import axios from 'axios';
 
 // --- CONFIGURATION ---
-// 1. In Production (Vercel): Use relative path '/api'. 
-//    Vercel's "rewrites" (in vercel.json) will forward this to Render.
-//    This allows cookies to work correctly (Same-Site).
-// 2. In Development (Local): Fall back to localhost.
+// CHANGED: In production, we use '/api' (relative path).
+// Vercel will see this and proxy it to Render based on vercel.json.
+// This allows cookies to work perfectly.
 const baseURL = import.meta.env.MODE === 'production' 
   ? '/api' 
   : 'http://localhost:4000/api';
@@ -19,20 +18,17 @@ const api = axios.create({
   }
 });
 
+// Response Interceptor to handle errors gracefully
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Better error logging
-    if (error.response?.status === 401) {
-        console.warn("Unauthorized request - User may need to log in again.");
-    }
     const message = error.response?.data?.error || error.message || 'An unexpected error occurred';
     return Promise.reject({ ...error, message });
   }
 );
 
 // --- SERVICES ---
-
+// (Keep all your existing service exports below exactly as they were)
 export const AuthService = {
   login: (credentials: any) => api.post('/auth/login', credentials),
   signup: (data: any, paymentRef?: string) => api.post('/auth/signup', { ...data, paymentRef }),

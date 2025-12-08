@@ -173,15 +173,6 @@ const App: React.FC = () => {
       try {
           const { data } = await AuthService.login({ email, password });
           
-          // --- DEBUGGING LOGS (Check Console F12) ---
-          console.log("--------------------------------");
-          console.log("LOGIN DEBUG INFO:");
-          console.log("Email:", data.user.email);
-          console.log("Roles from Server:", data.user.roles);
-          console.log("Is SuperAdmin?", data.user.roles.includes('SuperAdmin'));
-          console.log("--------------------------------");
-          // ------------------------------------------
-
           setAppState(prev => ({
               ...prev,
               currentUser: data.user,
@@ -190,7 +181,7 @@ const App: React.FC = () => {
           }));
           
           if (data.user.roles.includes('SuperAdmin')) {
-              // SuperAdmin stays on their dashboard, we don't fetch clinic data
+              // Admin logic handled by conditional render
           } else {
               await fetchAllData();
           }
@@ -363,7 +354,6 @@ const App: React.FC = () => {
       return <Auth onLogin={handleLogin} onSignup={handleSignup} plans={appState.subscriptionPlans} />;
   }
 
-  // --- ROUTING LOGIC ---
   if (appState.currentUser.roles.includes('SuperAdmin')) {
       return <SuperAdminDashboard appState={appState} onUpdateTenant={()=>{}} onCreateTenant={()=>{}} onUpdatePlan={handleUpdateSubscriptionPlan} onUpdateTicket={handleUpdateTicket} onLogout={handleLogout} />;
   }
@@ -442,15 +432,9 @@ const App: React.FC = () => {
            {currentView === 'patients' && selectedPatientId && (
                 <PatientDetail pet={appState.pets.find(p => p.id === selectedPatientId)!} owner={appState.owners.find(o => o.id === appState.pets.find(p => p.id === selectedPatientId)?.ownerId)} onBack={() => setSelectedPatientId(null)} onAddNote={handleAddNote} />
            )}
+           {/* FIXED: Removed extra props because Clients handles its own data now */}
            {currentView === 'clients' && (
-                <Clients 
-                    owners={appState.owners} 
-                    pets={appState.pets} 
-                    sales={appState.sales} 
-                    currency={currency}
-                    onAddClient={handleAddClient} 
-                    onAddPatient={handleAddPatient} 
-                />
+                <Clients currency={currency} />
             )}
            {currentView === 'appointments' && <Appointments appointments={appState.appointments} pets={appState.pets} owners={appState.owners} onAddAppointment={handleAddAppointment} />}
            {currentView === 'treatments' && <Treatments activePatients={appState.pets} appointments={appState.appointments} consultations={appState.consultations} owners={appState.owners} settings={currentTenant.settings} plan={currentTenant.plan} onSelectPatient={handlePatientSelect} onAddConsultation={handleAddConsultation} onAddLabRequest={handleAddLabRequest} onAddPatient={handleAddPatient} />}

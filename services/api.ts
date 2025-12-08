@@ -1,34 +1,42 @@
 import axios from 'axios';
 
 // --- CONFIGURATION ---
-// CHANGED: In production, we use '/api' (relative path).
-// Vercel will see this and proxy it to Render based on vercel.json.
-// This allows cookies to work perfectly.
+// FIX: We now point directly to the Render backend.
+// This prevents the "405 Method Not Allowed" error caused by Vercel
+// trying to handle the '/api' route locally instead of proxying it.
+const PRODUCTION_API_URL = 'https://vetnexus-backend.onrender.com/api';
+const LOCAL_API_URL = 'http://localhost:4000/api';
+
 const baseURL = import.meta.env.MODE === 'production' 
-  ? '/api' 
-  : 'http://localhost:4000/api';
+  ? PRODUCTION_API_URL
+  : LOCAL_API_URL;
 
 console.log("API Configured to:", baseURL);
 
 const api = axios.create({
   baseURL,
-  withCredentials: true,
+  withCredentials: true, // Crucial for cookies/sessions across domains
   headers: {
     'Content-Type': 'application/json',
   }
 });
 
-// Response Interceptor to handle errors gracefully
+// Response Interceptor to handle errors and log them for debugging
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Log the actual URL that failed to help debugging
+    if (error.config) {
+        console.error(`API Request failed on: ${error.config.url}`);
+    }
+    
     const message = error.response?.data?.error || error.message || 'An unexpected error occurred';
     return Promise.reject({ ...error, message });
   }
 );
 
 // --- SERVICES ---
-// (Keep all your existing service exports below exactly as they were)
+
 export const AuthService = {
   login: (credentials: any) => api.post('/auth/login', credentials),
   signup: (data: any, paymentRef?: string) => api.post('/auth/signup', { ...data, paymentRef }),

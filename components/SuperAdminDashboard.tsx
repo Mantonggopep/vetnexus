@@ -3,7 +3,7 @@ import { AppState, SubscriptionPlan, SupportTicket, Tenant, UserProfile, Subscri
 import { 
     LayoutDashboard, Building, CreditCard, LogOut, 
     Plus, Cpu, HardDrive, ShieldCheck, X, Edit,
-    Search, ChevronRight, TrendingUp, Server
+    Search, ChevronRight, TrendingUp, Server, Lock // <--- Added Lock to imports
 } from 'lucide-react';
 import { SuperAdminService, PlanService } from '../services/api';
 

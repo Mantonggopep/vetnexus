@@ -4,22 +4,33 @@ import { Search, Mail, Phone, MapPin, ChevronRight, ArrowLeft, Plus, MessageSqua
 import { formatCurrency } from '../utils/uiUtils';
 
 interface ClientsProps {
-  owners: Owner[];
-  pets: Pet[];
-  sales: SaleRecord[]; 
+  owners?: Owner[]; // Made optional for safety
+  pets?: Pet[];
+  sales?: SaleRecord[]; 
   communications?: CommunicationLog[];
   currency: string;
   onAddClient: (client: Omit<Owner, 'id' | 'clientNumber'>) => void;
   onAddPatient: (pet: Omit<Pet, 'id' | 'imageUrl' | 'vitalsHistory' | 'notes'> & { initialWeight?: number }) => void;
 }
 
-const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications = [], currency, onAddClient, onAddPatient }) => {
+const Clients: React.FC<ClientsProps> = ({ 
+    owners = [], 
+    pets = [], 
+    sales = [], 
+    communications = [], 
+    currency, 
+    onAddClient, 
+    onAddPatient 
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  
+  // Modals
   const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
   const [isAddPatientModalOpen, setIsAddPatientModalOpen] = useState(false);
+  
+  // Tabs
   const [activeTab, setActiveTab] = useState<'patients' | 'financials' | 'communication'>('patients');
-  const [isAnimating, setIsAnimating] = useState(false);
 
   // Form States
   const [newClient, setNewClient] = useState({ name: '', email: '', phone: '', address: '' });
@@ -27,23 +38,15 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
       name: '', species: 'Dog', breed: '', age: '', gender: 'Male', allergies: '', color: '', initialWeight: ''
   });
 
+  // Safe Filtering
   const filteredOwners = owners.filter(owner => 
-    owner.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (owner.name && owner.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (owner.email && owner.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    owner.phone.includes(searchTerm) ||
+    (owner.phone && owner.phone.includes(searchTerm)) ||
     (owner.clientNumber && owner.clientNumber.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const selectedClient = owners.find(o => o.id === selectedClientId);
-
-  // Animation trigger
-  useEffect(() => {
-    if (selectedClientId) {
-        setIsAnimating(true);
-        const timer = setTimeout(() => setIsAnimating(false), 400);
-        return () => clearTimeout(timer);
-    }
-  }, [selectedClientId]);
 
   const handleSaveClient = (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,9 +87,9 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
     const totalSpent = clientSales.filter(s => s.status === 'Paid').reduce((sum, s) => sum + s.total, 0);
     
     return (
-        <div className={`flex flex-col h-full overflow-hidden transition-all duration-500 ease-out ${isAnimating ? 'opacity-0 translate-y-8 scale-95' : 'opacity-100 translate-y-0 scale-100'}`}>
+        <div className="flex flex-col h-full overflow-hidden animate-fade-in-up">
              {/* Detail Header */}
-             <div className="flex items-center justify-between mb-4 shrink-0">
+             <div className="flex items-center justify-between mb-4 shrink-0 px-6 pt-4">
                 <button 
                     onClick={() => setSelectedClientId(null)} 
                     className="group flex items-center text-slate-500 hover:text-slate-800 transition-all duration-200 px-4 py-2 rounded-xl hover:bg-white hover:shadow-sm"
@@ -98,13 +101,12 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                 </button>
             </div>
 
-            <div className="flex-1 grid grid-cols-12 gap-6 overflow-hidden pb-6">
+            <div className="flex-1 grid grid-cols-12 gap-6 overflow-hidden px-6 pb-6">
                 {/* Left: Profile Card */}
                 <div className="col-span-12 md:col-span-4 lg:col-span-3 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
-                    <div className="bg-white/90 backdrop-blur-xl rounded-[2rem] p-8 border border-rose-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group hover:shadow-2xl hover:shadow-rose-500/10 transition-all duration-500">
-                        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-slate-900/10 to-transparent z-0"></div>
+                    <div className="bg-white/90 backdrop-blur-xl rounded-[2rem] p-8 border border-rose-100 shadow-xl shadow-slate-200/50 relative overflow-hidden">
                         <div className="relative z-10 flex flex-col items-center text-center">
-                            <div className="w-28 h-28 rounded-full bg-gradient-to-br from-rose-100 to-rose-200 flex items-center justify-center text-rose-600 text-4xl font-bold shadow-2xl shadow-rose-500/20 ring-4 ring-white mb-4 transform group-hover:scale-105 transition-transform duration-500">
+                            <div className="w-28 h-28 rounded-full bg-gradient-to-br from-rose-100 to-rose-200 flex items-center justify-center text-rose-600 text-4xl font-bold shadow-2xl shadow-rose-500/20 ring-4 ring-white mb-4">
                                 {selectedClient.name.charAt(0)}
                             </div>
                             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{selectedClient.name}</h1>
@@ -119,17 +121,17 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                         </div>
 
                         <div className="mt-8 space-y-4 relative z-10">
-                             <div className="p-4 bg-slate-50 rounded-2xl group/item hover:bg-emerald-50 transition-colors border border-transparent hover:border-emerald-100">
+                             <div className="p-4 bg-slate-50 rounded-2xl border border-transparent">
                                 <p className="text-xs font-bold text-emerald-700 uppercase mb-1 flex items-center"><Phone className="w-3 h-3 mr-1"/> Mobile</p>
                                 <p className="text-sm font-semibold text-slate-700">{selectedClient.phone}</p>
                              </div>
                              {selectedClient.email && (
-                                <div className="p-4 bg-slate-50 rounded-2xl group/item hover:bg-rose-50 transition-colors border border-transparent hover:border-rose-100">
+                                <div className="p-4 bg-slate-50 rounded-2xl border border-transparent">
                                     <p className="text-xs font-bold text-rose-500 uppercase mb-1 flex items-center"><Mail className="w-3 h-3 mr-1"/> Email</p>
                                     <p className="text-sm font-semibold text-slate-700 break-all">{selectedClient.email}</p>
                                 </div>
                              )}
-                             <div className="p-4 bg-slate-50 rounded-2xl group/item hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200">
+                             <div className="p-4 bg-slate-50 rounded-2xl border border-transparent">
                                 <p className="text-xs font-bold text-slate-500 uppercase mb-1 flex items-center"><MapPin className="w-3 h-3 mr-1"/> Address</p>
                                 <p className="text-sm font-semibold text-slate-700 leading-relaxed">{selectedClient.address || 'N/A'}</p>
                              </div>
@@ -179,19 +181,20 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                     <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-white/30">
                         {activeTab === 'patients' && (
                             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                                {clientPets.map((pet, idx) => (
+                                {clientPets.map((pet) => (
                                     <div 
                                         key={pet.id} 
-                                        className="bg-white p-5 rounded-[2rem] border border-rose-50 shadow-sm hover:shadow-2xl hover:shadow-rose-500/10 hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative overflow-hidden"
-                                        style={{ animation: `fadeInUp 0.5s ease-out forwards ${idx * 0.1}s`, opacity: 0 }}
+                                        className="bg-white p-5 rounded-[2rem] border border-rose-50 shadow-sm hover:shadow-lg transition-all cursor-pointer relative overflow-hidden"
                                     >
-                                        <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-bl-[4rem] -mr-8 -mt-8 transition-all group-hover:bg-rose-100"></div>
+                                        <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-bl-[4rem] -mr-8 -mt-8"></div>
                                         <div className="flex items-center space-x-4 mb-4 relative z-10">
-                                            <img 
-                                                src={pet.imageUrl || `https://ui-avatars.com/api/?name=${pet.name}&background=random`} 
-                                                className="w-20 h-20 rounded-2xl object-cover shadow-lg group-hover:scale-105 transition-transform duration-500 ring-2 ring-white" 
-                                                alt={pet.name}
-                                            />
+                                            <div className="w-20 h-20 rounded-2xl bg-slate-200 overflow-hidden shadow-lg ring-2 ring-white">
+                                                 <img 
+                                                    src={pet.imageUrl || `https://ui-avatars.com/api/?name=${pet.name}&background=random`} 
+                                                    className="w-full h-full object-cover"
+                                                    alt={pet.name}
+                                                />
+                                            </div>
                                             <div>
                                                 <h4 className="text-xl font-bold text-slate-900 leading-tight">{pet.name}</h4>
                                                 <p className="text-sm font-medium text-emerald-700">{pet.breed}</p>
@@ -223,7 +226,7 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                         )}
 
                         {activeTab === 'financials' && (
-                             <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden animate-fade-in-up">
+                             <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50 border-b border-slate-100">
                                         <tr>
@@ -260,7 +263,7 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                         )}
                         
                         {activeTab === 'communication' && (
-                             <div className="space-y-6 max-w-3xl mx-auto animate-fade-in-up">
+                             <div className="space-y-6 max-w-3xl mx-auto">
                                 {clientComms.map((comm, idx) => (
                                     <div key={comm.id} className="relative flex space-x-6">
                                         {idx !== clientComms.length - 1 && (
@@ -331,7 +334,7 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
 
   // --- 2. LIST VIEW RENDER (Main Page) ---
   return (
-    <div className="bg-white/50 backdrop-blur-xl rounded-[2rem] shadow-2xl shadow-slate-200/60 border border-white/60 flex flex-col h-full overflow-hidden relative">
+    <div className="bg-white/50 backdrop-blur-xl rounded-[2rem] shadow-2xl shadow-slate-200/60 border border-white/60 flex flex-col h-full overflow-hidden relative mx-6 mb-6">
         {/* Header - NOW FIXED & VISIBLE */}
         <div className="p-8 pb-4 flex flex-col md:flex-row justify-between items-center gap-6 z-20 relative shrink-0">
             <div>
@@ -371,7 +374,7 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
 
         {/* Floating Rows Container - FIXED OVERFLOW */}
         <div className="flex-1 overflow-y-auto custom-scrollbar px-8 pb-8 space-y-3">
-            {filteredOwners.map((owner, index) => {
+            {filteredOwners.length > 0 ? filteredOwners.map((owner) => {
                 const ownerPets = pets.filter(p => p.ownerId === owner.id);
                 
                 return (
@@ -384,7 +387,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                             hover:shadow-2xl hover:shadow-rose-500/10 hover:scale-[1.01] hover:z-10 hover:border-rose-100
                             transition-all duration-300 ease-spring
                         "
-                        style={{ animation: `fadeInUp 0.4s ease-out forwards ${index * 0.05}s`, opacity: 0 }}
                     >
                         {/* 1. Client Profile - Rose Gold Avatar */}
                         <div className="col-span-3 flex items-center pl-2">
@@ -458,12 +460,10 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                         </div>
                     </div>
                 );
-            })}
-            
-            {filteredOwners.length === 0 && (
+            }) : (
                  <div className="flex flex-col items-center justify-center h-64 text-slate-400 border-2 border-dashed border-slate-200 rounded-3xl bg-white/30">
                     <Search className="w-12 h-12 mb-4 opacity-20" />
-                    <p className="font-medium">No clients found matching "{searchTerm}"</p>
+                    <p className="font-medium">{owners.length === 0 ? "No clients registered yet." : `No clients found matching "${searchTerm}"`}</p>
                  </div>
             )}
         </div>
@@ -503,7 +503,7 @@ const Modal = ({ open, onClose, title, children }: { open: boolean, onClose: () 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
-            <div className="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-white/50">
+            <div className="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden border border-white/50">
                 <div className="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-10">
                     <h3 className="font-bold text-slate-800 text-lg tracking-tight">{title}</h3>
                     <button onClick={onClose} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors">

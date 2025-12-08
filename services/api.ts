@@ -61,7 +61,8 @@ export const OwnerService = {
 export const InventoryService = {
   getAll: () => api.get('/inventory'),
   create: (data: any) => api.post('/inventory', data),
-  update: (id: string, data: any) => api.patch(`/inventory/${id}`, data)
+  update: (id: string, data: any) => api.patch(`/inventory/${id}`, data),
+  delete: (id: string) => api.delete(`/inventory/${id}`)
 };
 
 export const AppointmentService = {
@@ -72,6 +73,7 @@ export const AppointmentService = {
 export const SaleService = {
   getAll: () => api.get('/sales'),
   create: (data: any) => api.post('/sales', data),
+  delete: (id: string) => api.delete(`/sales/${id}`)
 };
 
 export const ConsultationService = {

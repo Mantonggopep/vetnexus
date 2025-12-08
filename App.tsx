@@ -19,7 +19,7 @@ import PageTransition from './components/PageTransition';
 import DynamicIsland, { ToastType } from './components/DynamicIsland';
 import SpotlightSearch from './components/SpotlightSearch';
 import { Auth } from './components/Auth';
-import { LogOut, ChevronDown, User as UserIcon, Search, Home } from 'lucide-react';
+import { LogOut, User as UserIcon, Search, Home } from 'lucide-react';
 import { AuthService, PatientService, OwnerService, InventoryService, AppointmentService, SaleService, ConsultationService, LabService, ExpenseService, PlanService, UserService, BranchService, SettingsService, LogService } from './services/api';
 import { getAvatarGradient } from './utils/uiUtils';
 
@@ -29,7 +29,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
-  // --- UPDATED: Initialize from Local Storage ---
+  // --- Initialize from Local Storage ---
   const [currentView, setCurrentView] = useState<ViewType>(() => {
       const savedView = localStorage.getItem('vet_nexus_current_view');
       return (savedView as ViewType) || 'dashboard';
@@ -38,7 +38,6 @@ const App: React.FC = () => {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(() => {
       return localStorage.getItem('vet_nexus_selected_patient_id');
   });
-  // ----------------------------------------------
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
@@ -52,7 +51,7 @@ const App: React.FC = () => {
 
   const hideToast = () => setToast(prev => ({ ...prev, visible: false }));
 
-  // --- UPDATED: Persist View State Changes ---
+  // --- Persist View State Changes ---
   useEffect(() => {
       localStorage.setItem('vet_nexus_current_view', currentView);
   }, [currentView]);
@@ -64,7 +63,6 @@ const App: React.FC = () => {
           localStorage.removeItem('vet_nexus_selected_patient_id');
       }
   }, [selectedPatientId]);
-  // -------------------------------------------
 
   const [appState, setAppState] = useState<AppState>({
     currentUser: null,
@@ -144,12 +142,13 @@ const App: React.FC = () => {
                     currentTenantId: data.tenant.id,
                     tenants: [data.tenant]
                 }));
+                // Check roles correctly as an array
                 if (!data.user.roles.includes('SuperAdmin')) {
                     await fetchAllData();
                 }
             }
         } catch (e) {
-            // Session expired
+            // Session expired, stay on login
         } finally {
             setIsLoading(false);
         }
@@ -181,7 +180,7 @@ const App: React.FC = () => {
           }));
           
           if (data.user.roles.includes('SuperAdmin')) {
-              // Admin logic
+              // Admin logic handled by conditional render
           } else {
               await fetchAllData();
           }
@@ -222,7 +221,6 @@ const App: React.FC = () => {
       setIsProfileOpen(false);
       setIsLoading(false);
       
-      // Clear persistence on logout
       localStorage.removeItem('vet_nexus_current_view');
       localStorage.removeItem('vet_nexus_selected_patient_id');
       setCurrentView('dashboard');
@@ -261,9 +259,7 @@ const App: React.FC = () => {
   }, sale.status === 'Paid' ? 'Receipt generated & Stock updated' : 'Invoice generated successfully');
 
   const handleDeleteSale = async (id: string, reason: string) => withLoading(async () => {
-      const sale = appState.sales.find(s => s.id === id);
-      if (!sale) return;
-
+      // Reason unused in API call currently, but kept for future auditing
       await SaleService.delete(id);
       
       const [updatedSales, updatedLogs, updatedInv] = await Promise.all([
@@ -435,7 +431,16 @@ const App: React.FC = () => {
            {currentView === 'patients' && selectedPatientId && (
                 <PatientDetail pet={appState.pets.find(p => p.id === selectedPatientId)!} owner={appState.owners.find(o => o.id === appState.pets.find(p => p.id === selectedPatientId)?.ownerId)} onBack={() => setSelectedPatientId(null)} onAddNote={handleAddNote} />
            )}
-           {currentView === 'clients' && <Clients owners={appState.owners} pets={appState.pets} sales={appState.sales} onAddClient={handleAddClient} onAddPatient={handleAddPatient} />}
+           {currentView === 'clients' && (
+                <Clients 
+                    owners={appState.owners} 
+                    pets={appState.pets} 
+                    sales={appState.sales} 
+                    currency={currency}
+                    onAddClient={handleAddClient} 
+                    onAddPatient={handleAddPatient} 
+                />
+            )}
            {currentView === 'appointments' && <Appointments appointments={appState.appointments} pets={appState.pets} owners={appState.owners} onAddAppointment={handleAddAppointment} />}
            {currentView === 'treatments' && <Treatments activePatients={appState.pets} appointments={appState.appointments} consultations={appState.consultations} owners={appState.owners} settings={currentTenant.settings} plan={currentTenant.plan} onSelectPatient={handlePatientSelect} onAddConsultation={handleAddConsultation} onAddLabRequest={handleAddLabRequest} onAddPatient={handleAddPatient} />}
            {currentView === 'inventory' && <Inventory items={appState.inventory} currency={currency} onAddItem={handleAddInventory} onUpdateItem={handleUpdateInventory} />}

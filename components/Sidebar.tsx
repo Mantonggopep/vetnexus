@@ -15,7 +15,10 @@ import {
   Shield,
   Activity
 } from "lucide-react";
-import { AppState, UserRole } from "../types";
+import { AppState } from "../types";
+
+// Removed UserRole import to avoid "used as value" error if it's just a type.
+// We will check the string 'SuperAdmin' directly.
 
 interface SidebarProps {
   currentView: string;
@@ -37,20 +40,21 @@ const Sidebar: React.FC<SidebarProps> = ({
   
   // Navigation Items Configuration
   const navItems = [
-    { id: "Dashboard", label: "Overview", icon: LayoutDashboard },
-    { id: "Clients", label: "Patients", icon: Users },
-    { id: "Appointments", label: "Schedule", icon: Calendar },
-    { id: "Treatments", label: "Consultations", icon: Stethoscope },
-    { id: "Lab", label: "Lab Results", icon: TestTube },
-    { id: "POS", label: "Payments", icon: CreditCard },
-    { id: "Inventory", label: "Inventory", icon: ShoppingBag },
-    { id: "Reports", label: "Reports", icon: FileBarChart },
-    { id: "Settings", label: "Settings", icon: Settings },
+    { id: "dashboard", label: "Overview", icon: LayoutDashboard }, // lowercase IDs to match App.tsx switch
+    { id: "clients", label: "Patients", icon: Users },
+    { id: "appointments", label: "Schedule", icon: Calendar },
+    { id: "treatments", label: "Consultations", icon: Stethoscope },
+    { id: "lab", label: "Lab Results", icon: TestTube },
+    { id: "pos", label: "Payments", icon: CreditCard },
+    { id: "inventory", label: "Inventory", icon: ShoppingBag },
+    { id: "reports", label: "Reports", icon: FileBarChart },
+    { id: "settings", label: "Settings", icon: Settings },
   ];
 
-  // Super Admin Item
-  if (currentUser?.role === UserRole.SuperAdmin) {
-    navItems.splice(1, 0, { id: "SuperAdminDashboard", label: "Admin", icon: Shield });
+  // Super Admin Item Check
+  // Fix: Check 'roles' array instead of 'role' property
+  if (currentUser?.roles && currentUser.roles.includes('SuperAdmin')) {
+    navItems.splice(1, 0, { id: "superadmin", label: "Admin", icon: Shield });
   }
 
   return (
@@ -58,7 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       className={`
         relative flex flex-col h-full transition-all duration-300 ease-in-out
         ${isCollapsed ? "w-20" : "w-64"}
-        bg-white border-r border-slate-200 shadow-sm z-20
+        bg-white border-r border-slate-200 shadow-sm z-20 hidden md:flex
       `}
     >
       {/* --- LOGO AREA --- */}
@@ -74,7 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
         
-        {/* If collapsed, show the logo icon as the header, otherwise show the toggle button on the right */}
+        {/* If collapsed, show the logo icon as the header */}
         {isCollapsed && (
            <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600">
               <Activity className="w-6 h-6" />
@@ -94,7 +98,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* --- NAVIGATION LINKS --- */}
       <div className="flex-1 overflow-y-auto custom-scrollbar px-3 space-y-1 py-4">
         {navItems.map((item) => {
-          const isActive = currentView === item.id;
+          // Case-insensitive check just in case
+          const isActive = currentView.toLowerCase() === item.id.toLowerCase();
           const Icon = item.icon;
 
           return (
@@ -104,7 +109,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               className={`
                 group relative flex items-center w-full p-3 rounded-xl transition-all duration-200
                 ${isActive 
-                  ? "bg-teal-50 text-teal-700" 
+                  ? "bg-teal-50 text-teal-700 shadow-sm" 
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                 }
               `}
@@ -136,7 +141,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                   translate-x-2 group-hover:translate-x-0 transform duration-200
                 ">
                   {item.label}
-                  {/* Little triangle pointer */}
                   <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 border-4 border-transparent border-r-slate-800" />
                 </div>
               )}
@@ -145,7 +149,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {/* --- COLLAPSE TRIGGER (If collapsed, show button at bottom to expand) --- */}
+      {/* --- COLLAPSE TRIGGER --- */}
       {isCollapsed && (
         <button 
           onClick={onToggleCollapse}
@@ -160,9 +164,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className={`flex items-center ${isCollapsed ? "justify-center" : "gap-3"}`}>
           <div className="relative">
             <div className="w-9 h-9 rounded-full bg-slate-200 border border-white shadow-sm flex items-center justify-center overflow-hidden">
-               <span className="font-bold text-slate-600 text-sm">
-                 {currentUser?.name?.[0] || "U"}
-               </span>
+               {currentUser?.avatarUrl ? (
+                   <img src={currentUser.avatarUrl} alt="User" className="w-full h-full object-cover" />
+               ) : (
+                   <span className="font-bold text-slate-600 text-sm">
+                     {currentUser?.name?.[0] || "U"}
+                   </span>
+               )}
             </div>
             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>
           </div>
@@ -173,7 +181,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {currentUser?.name}
               </p>
               <p className="text-[10px] text-slate-500 truncate uppercase font-bold tracking-wider">
-                {currentUser?.role}
+                {/* Display first role or 'Staff' */}
+                {currentUser?.roles && currentUser.roles.length > 0 ? currentUser.roles[0] : 'Staff'}
               </p>
             </div>
           )}

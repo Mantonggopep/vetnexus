@@ -15,7 +15,9 @@ import { inventoryRoutes } from './routes/inventory.routes';
 import { aiRoutes } from './routes/ai.routes';
 
 const app: FastifyInstance = Fastify({ 
-  logger: process.env.NODE_ENV !== 'production' 
+  logger: process.env.NODE_ENV !== 'production',
+  // Increase payload limit if you are uploading images/files
+  bodyLimit: 1048576 * 10 // 10MB
 });
 
 const PORT = parseInt(process.env.PORT || '4000');
@@ -23,40 +25,58 @@ const PORT = parseInt(process.env.PORT || '4000');
 // --- PLUGINS ---
 app.register(helmet, { contentSecurityPolicy: false, global: true });
 
+// --- CRITICAL CORS FIX ---
 app.register(cors, {
   origin: (origin, cb) => {
-    // defined allowed origins
-    const allowed = [
+    const allowedOrigins = [
       'http://localhost:5173', 
       'http://localhost:4173', 
-      process.env.CLIENT_URL
-    ].filter((url): url is string => !!url); // Type-safe filter
+      'https://vetnexuspro.vercel.app', // Hardcoded to ensure Vercel works
+      process.env.CLIENT_URL // Fallback from env vars
+    ];
 
-    // Allow requests with no origin (like mobile apps or curl) or if origin is in allow list
-    if (!origin || allowed.includes(origin) || process.env.NODE_ENV !== 'production') {
+    // Remove undefined/null and normalize (remove trailing slashes)
+    const cleanOrigins = allowedOrigins
+      .filter((url): url is string => !!url)
+      .map(url => url.replace(/\/$/, ''));
+
+    // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+    if (!origin) return cb(null, true);
+
+    if (cleanOrigins.includes(origin)) {
       return cb(null, true);
     }
-    return cb(new Error("Not allowed"), false);
+
+    // Development fallback: Allow all if not in production
+    if (process.env.NODE_ENV !== 'production') {
+      return cb(null, true);
+    }
+
+    console.warn(`Blocked CORS request from: ${origin}`);
+    return cb(new Error("Not allowed by CORS"), false);
   },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
+  credentials: true, // REQUIRED for cookies/sessions to work
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 });
 
 app.register(cookie, { 
   secret: process.env.COOKIE_SECRET || 'super-secret', 
-  hook: 'onRequest' 
+  hook: 'onRequest',
+  parseOptions: {} 
 });
 
 // --- REGISTER ROUTES ---
 // Prefix all with /api
 app.register(async (api) => {
+    // Health Check Endpoint (useful for Render to know app is alive)
+    api.get('/health', async () => { return { status: 'ok', timestamp: new Date() } });
+
     api.register(authRoutes);
-    api.register(adminRoutes); // Make sure this file has the GET /plans route!
+    api.register(adminRoutes);
     api.register(userRoutes);
     api.register(clinicalRoutes);
     api.register(inventoryRoutes);
-    
-    // Register AI routes
     api.register(aiRoutes, { prefix: '/ai' }); 
 }, { prefix: '/api' });
 
@@ -64,15 +84,14 @@ app.register(async (api) => {
 // --- START & SEED ---
 const start = async () => {
   try {
-    if (!process.env.JWT_SECRET) console.warn("WARNING: JWT_SECRET not set.");
-    if (!process.env.DATABASE_URL) console.warn("WARNING: DATABASE_URL not set.");
+    if (!process.env.JWT_SECRET) console.warn("⚠️ WARNING: JWT_SECRET not set.");
+    if (!process.env.DATABASE_URL) console.warn("⚠️ WARNING: DATABASE_URL not set.");
 
-    // 1. Connect to DB first to ensure it's alive
+    // 1. Connect to DB first
     await prisma.$connect();
     console.log("✅ Connected to Database");
 
     // 2. Seed Plans
-    // This is the CRITICAL part that fixes your empty plans issue
     for (const p of DEFAULT_PLANS) {
         await prisma.plan.upsert({ where: { id: p.id }, update: p, create: p });
     }
@@ -86,7 +105,6 @@ const start = async () => {
     });
 
     const adminEmail = 'mantonggopep@gmail.com';
-    // Check if admin exists to avoid re-hashing password every restart
     const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail }});
     
     if (!existingAdmin) {
@@ -106,9 +124,10 @@ const start = async () => {
     // 4. Listen on 0.0.0.0 (Required for Render)
     await app.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌐 Accepting requests from: https://vetnexuspro.vercel.app`);
 
   } catch (err) { 
-    // Use console.error to ensure it shows in Render logs before exit
+    app.log.error(err);
     console.error("🔥 FAILED TO START SERVER:", err); 
     process.exit(1); 
   }

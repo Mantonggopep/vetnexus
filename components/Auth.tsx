@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tenant, UserProfile, SubscriptionTier, BillingPeriod, SubscriptionPlan } from '../types';
-import { Check, Shield, Mail, User, Building, Lock, Globe, AlertCircle, CreditCard, ArrowRight } from 'lucide-react';
+import { Shield, Mail, Lock, AlertCircle } from 'lucide-react';
 
 interface AuthProps {
   onLogin: (email: string, password: string) => Promise<boolean>;
@@ -8,7 +8,7 @@ interface AuthProps {
   plans?: SubscriptionPlan[];
 }
 
-// DEFINING PLANS WITH NEW LIMITS
+// DEFINING PLANS - REMOVED 'print' property as it was causing TS errors
 const DEFAULT_PLANS: SubscriptionPlan[] = [
     {
         id: 'Trial',
@@ -26,7 +26,7 @@ const DEFAULT_PLANS: SubscriptionPlan[] = [
             maxUsers: 2, 
             maxClients: 50, 
             maxStorageGB: 2, 
-            modules: { pos: true, lab: false, ai: false, reports: false, multiBranch: false, print: false } 
+            modules: { pos: true, lab: false, ai: false, reports: false, multiBranch: false } 
         }
     },
     {
@@ -38,7 +38,7 @@ const DEFAULT_PLANS: SubscriptionPlan[] = [
             maxUsers: 7, 
             maxClients: -1, 
             maxStorageGB: 10, 
-            modules: { pos: true, lab: true, ai: true, reports: true, multiBranch: false, print: true, aiLimit: 200 } 
+            modules: { pos: true, lab: true, ai: true, reports: true, multiBranch: false } 
         }
     },
     {
@@ -50,7 +50,7 @@ const DEFAULT_PLANS: SubscriptionPlan[] = [
             maxUsers: -1, 
             maxClients: -1, 
             maxStorageGB: 100, 
-            modules: { pos: true, lab: true, ai: true, reports: true, multiBranch: true, print: true, aiLimit: -1 } 
+            modules: { pos: true, lab: true, ai: true, reports: true, multiBranch: true } 
         }
     }
 ];

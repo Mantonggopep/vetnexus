@@ -3,22 +3,15 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { createLog, verifyPayment } from '../utils/serverHelpers';
-import { sendEmail } from '../utils/email'; // Ensure you created this file
+import { sendEmail } from '../utils/email';
 
 // Helper to generate 6-digit code
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 export async function authRoutes(app: FastifyInstance) {
     
-    // --- PLANS ---
-    app.get('/plans', async (req, reply) => {
-        const plans = await prisma.plan.findMany({ orderBy: { priceMonthly: 'asc' } });
-        return reply.send(plans.map(p => ({
-            id: p.id, name: p.name,
-            price: { Monthly: `NGN ${p.priceMonthly.toLocaleString()}`, Yearly: `NGN ${p.priceYearly.toLocaleString()}` },
-            features: JSON.parse(p.features), limits: JSON.parse(p.limits)
-        })));
-    });
+    // REMOVED: app.get('/plans') because it is now in admin.routes.ts
+    // This prevents the "Duplicate Route" error.
 
     // --- AUTH ME ---
     app.get('/auth/me', async (req, reply) => {

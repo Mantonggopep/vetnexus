@@ -1,14 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
-import { authenticate, AuthenticatedRequest } from '../middleware/auth';
-import os from 'os'; // Required for System Load stats
+import { authenticate } from '../middleware/auth';
+import os from 'os';
 
 export async function adminRoutes(app: FastifyInstance) {
     
     // 1. GET ALL TENANTS
     app.get('/admin/tenants', { preHandler: [authenticate] }, async (req, reply) => {
-        // Fetch tenants with counts for users and pets to display usage
         const tenants = await prisma.tenant.findMany({ 
             include: { 
                 _count: { select: { users: true, pets: true } } 
@@ -16,7 +15,6 @@ export async function adminRoutes(app: FastifyInstance) {
             orderBy: { joinedDate: 'desc' } 
         });
 
-        // Map data to match Frontend "Tenant" interface
         return reply.send(tenants.map(t => ({ 
             ...t, 
             settings: JSON.parse(t.settings), 
@@ -25,21 +23,18 @@ export async function adminRoutes(app: FastifyInstance) {
         })));
     });
 
-    // 2. GET ADMIN STATS (Fixed Revenue Calculation)
+    // 2. GET ADMIN STATS
     app.get('/admin/stats', { preHandler: [authenticate] }, async (req, reply) => {
         try {
             const tenants = await prisma.tenant.findMany();
             const activeTenants = tenants.filter(t => t.status === 'Active');
             
-            // Fetch Plans to get real pricing
             const plans = await prisma.plan.findMany();
 
-            // Calculate Monthly Revenue (MRR) based on Plan Price & Billing Cycle
             const monthlyRevenue = activeTenants.reduce((acc, tenant) => {
                 const plan = plans.find(p => p.id === tenant.plan);
                 if (!plan) return acc;
 
-                // If billed Yearly, divide by 12 for MRR. If Monthly, take full price.
                 if (tenant.billingPeriod === 'Yearly') {
                     return acc + (plan.priceYearly / 12);
                 } else {
@@ -47,11 +42,9 @@ export async function adminRoutes(app: FastifyInstance) {
                 }
             }, 0);
 
-            // Calculate System Resources (CPU/RAM)
             const totalMem = os.totalmem();
             const freeMem = os.freemem();
             const memoryUsage = Math.round(((totalMem - freeMem) / totalMem) * 100);
-            // safe check for cpu load
             const cpuUsage = os.loadavg() ? Math.min(Math.round(os.loadavg()[0] * 10), 100) : 0;
 
             return reply.send({ 
@@ -59,7 +52,7 @@ export async function adminRoutes(app: FastifyInstance) {
                 totalUsers: await prisma.user.count(), 
                 totalPatients: await prisma.pet.count(), 
                 activeSubscriptions: activeTenants.length, 
-                monthlyRevenue: Math.round(monthlyRevenue), // Rounded MRR
+                monthlyRevenue: Math.round(monthlyRevenue),
                 systemLoad: { cpuUsage, memoryUsage }
             });
         } catch (e) {
@@ -73,17 +66,15 @@ export async function adminRoutes(app: FastifyInstance) {
         const data = req.body as any;
         try {
             const result = await prisma.$transaction(async (tx) => {
-                // Check for existing email globally to prevent duplicate admin accounts
                 if (await tx.user.findFirst({ where: { email: data.email } })) {
                     throw new Error("Admin email already exists in the system");
                 }
 
-                // Create Tenant
                 const tenant = await tx.tenant.create({ 
                     data: { 
                         name: data.clinicName, 
                         plan: data.plan, 
-                        billingPeriod: data.billingPeriod || 'Monthly', // Capture Billing Period
+                        billingPeriod: data.billingPeriod || 'Monthly',
                         status: 'Active', 
                         settings: JSON.stringify({ 
                             name: data.clinicName, 
@@ -92,14 +83,13 @@ export async function adminRoutes(app: FastifyInstance) {
                     } 
                 });
 
-                // Create Admin User
                 await tx.user.create({ 
                     data: { 
                         tenantId: tenant.id, 
                         name: data.name || data.adminName, 
                         email: data.email, 
                         passwordHash: await bcrypt.hash(data.password, 10), 
-                        roles: JSON.stringify(['Admin', 'Veterinarian', 'SuperAdmin']) // Ensure Admin roles
+                        roles: JSON.stringify(['Admin', 'Veterinarian', 'SuperAdmin']) 
                     } 
                 });
 
@@ -121,8 +111,65 @@ export async function adminRoutes(app: FastifyInstance) {
             data: { 
                 status: body.status, 
                 plan: body.plan,
-                billingPeriod: body.billingPeriod // Allow updating billing period
+                billingPeriod: body.billingPeriod 
             } 
         }));
+    });
+
+    // =========================================================
+    // 5. MISSING PLAN ROUTES (Fixes Payment Plans not loading)
+    // =========================================================
+
+    // GET /api/plans
+    // Note: This is usually public so the pricing page can see it, 
+    // but here we allow it for the authenticated dashboard.
+    app.get('/plans', async (req, reply) => {
+        try {
+            const plans = await prisma.plan.findMany({
+                orderBy: { priceMonthly: 'asc' }
+            });
+
+            // Map Prisma data (JSON strings) to Frontend data (Objects)
+            const formattedPlans = plans.map(p => ({
+                id: p.id,
+                name: p.name,
+                price: {
+                    Monthly: p.priceMonthly,
+                    Yearly: p.priceYearly
+                },
+                features: JSON.parse(p.features), // Convert String -> Array
+                limits: JSON.parse(p.limits)      // Convert String -> Object
+            }));
+
+            return reply.send(formattedPlans);
+        } catch (error) {
+            console.error("Error fetching plans:", error);
+            return reply.status(500).send({ error: "Failed to fetch plans" });
+        }
+    });
+
+    // PATCH /api/plans/:id
+    app.patch('/plans/:id', { preHandler: [authenticate] }, async (req, reply) => {
+        const { id } = req.params as any;
+        const body = req.body as any;
+
+        try {
+            // Frontend sends flat prices but object features/limits
+            const updatedPlan = await prisma.plan.update({
+                where: { id },
+                data: {
+                    priceMonthly: body.priceMonthly,
+                    priceYearly: body.priceYearly,
+                    // Convert Array/Object -> JSON String for Database
+                    features: JSON.stringify(body.features), 
+                    limits: JSON.stringify(body.limits)
+                }
+            });
+
+            return reply.send(updatedPlan);
+        } catch (error) {
+            console.error("Error updating plan:", error);
+            return reply.status(500).send({ error: "Failed to update plan" });
+        }
     });
 }

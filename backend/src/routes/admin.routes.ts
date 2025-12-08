@@ -89,7 +89,8 @@ export async function adminRoutes(app: FastifyInstance) {
                         name: data.name || data.adminName, 
                         email: data.email, 
                         passwordHash: await bcrypt.hash(data.password, 10), 
-                        roles: JSON.stringify(['Admin', 'Veterinarian', 'SuperAdmin']) 
+                        // ✅ FIX: Removed 'SuperAdmin' from the roles list
+                        roles: JSON.stringify(['Admin', 'Veterinarian']) 
                     } 
                 });
 
@@ -117,19 +118,16 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     // =========================================================
-    // 5. MISSING PLAN ROUTES (Fixes Payment Plans not loading)
+    // 5. PLAN ROUTES
     // =========================================================
 
     // GET /api/plans
-    // Note: This is usually public so the pricing page can see it, 
-    // but here we allow it for the authenticated dashboard.
     app.get('/plans', async (req, reply) => {
         try {
             const plans = await prisma.plan.findMany({
                 orderBy: { priceMonthly: 'asc' }
             });
 
-            // Map Prisma data (JSON strings) to Frontend data (Objects)
             const formattedPlans = plans.map(p => ({
                 id: p.id,
                 name: p.name,
@@ -137,8 +135,8 @@ export async function adminRoutes(app: FastifyInstance) {
                     Monthly: p.priceMonthly,
                     Yearly: p.priceYearly
                 },
-                features: JSON.parse(p.features), // Convert String -> Array
-                limits: JSON.parse(p.limits)      // Convert String -> Object
+                features: JSON.parse(p.features), 
+                limits: JSON.parse(p.limits)      
             }));
 
             return reply.send(formattedPlans);
@@ -154,13 +152,11 @@ export async function adminRoutes(app: FastifyInstance) {
         const body = req.body as any;
 
         try {
-            // Frontend sends flat prices but object features/limits
             const updatedPlan = await prisma.plan.update({
                 where: { id },
                 data: {
                     priceMonthly: body.priceMonthly,
                     priceYearly: body.priceYearly,
-                    // Convert Array/Object -> JSON String for Database
                     features: JSON.stringify(body.features), 
                     limits: JSON.stringify(body.limits)
                 }

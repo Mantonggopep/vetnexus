@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { SaleRecord, InventoryItem, Pet, Consultation } from '../types';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
@@ -128,7 +127,8 @@ const Reports: React.FC<ReportsProps> = ({ sales, inventory, pets, consultations
                         <BarChart data={revenueData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} prefix="" />
+                            {/* FIXED: Removed 'prefix' prop, used tickFormatter instead */}
+                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} tickFormatter={(val) => `${currency} ${val}`} />
                             <Tooltip 
                                 contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
                                 formatter={(value: number) => [formatCurrency(value, currency), 'Revenue']}
@@ -153,7 +153,7 @@ const Reports: React.FC<ReportsProps> = ({ sales, inventory, pets, consultations
                                 paddingAngle={5}
                                 dataKey="value"
                             >
-                                {speciesData.map((entry, index) => (
+                                {speciesData.map((_entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>

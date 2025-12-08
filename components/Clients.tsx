@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Owner, Pet, SaleRecord, CommunicationLog, Species } from '../types';
-import { Search, Mail, Phone, MapPin, ChevronRight, UserPlus, ArrowLeft, Plus, DollarSign, MessageSquare, PawPrint, AlertTriangle, X, Calendar, Trash2, Lock, Shield } from 'lucide-react';
+import { Search, Mail, Phone, MapPin, ChevronRight, ArrowLeft, Plus, MessageSquare, PawPrint, X, Calendar, Trash2, Lock, Shield } from 'lucide-react';
 import { formatCurrency } from '../utils/uiUtils';
 import api from '../services/api';
 
@@ -12,7 +12,6 @@ interface ClientsProps {
   currency: string;
   onAddClient: (client: Omit<Owner, 'id' | 'clientNumber'>) => void;
   onAddPatient: (pet: Omit<Pet, 'id' | 'imageUrl' | 'vitalsHistory' | 'notes'> & { initialWeight?: number }) => void;
-  // New prop to trigger a refresh after delete
   onRefresh?: () => void;
 }
 
@@ -24,7 +23,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
   const [activeTab, setActiveTab] = useState<'patients' | 'financials' | 'communication' | 'login'>('patients');
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Form States
   const [newClient, setNewClient] = useState({ name: '', email: '', phone: '', address: '' });
   const [newPatient, setNewPatient] = useState({ 
       name: '', species: 'Dog', breed: '', age: '', gender: 'Male', allergies: '', color: '', initialWeight: ''
@@ -45,7 +43,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
     return () => clearTimeout(timer);
   }, [selectedClientId]);
 
-  // --- STRICT DUPLICATE CHECK ---
   const handleSaveClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newClient.name || !newClient.phone) return;
@@ -57,25 +54,18 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
 
         if (data.exists) {
             const confirm = window.confirm(
-                `⚠️ DUPLICATE DETECTED\n\n` + 
-                `Client: ${data.match.name}\n` +
-                `Phone: ${data.match.phone}\n` +
-                `ID: ${data.match.clientNumber}\n\n` + 
-                `This client is already registered. Are you sure you want to create a DUPLICATE?`
+                `⚠️ DUPLICATE DETECTED\n\nClient: ${data.match.name}\nPhone: ${data.match.phone}\nID: ${data.match.clientNumber}\n\nThis client is already registered. Are you sure you want to create a DUPLICATE?`
             );
-            
-            // STRICT BLOCK: If they say Cancel, we stop immediately.
-            if (!confirm) {
-                return;
-            }
+            if (!confirm) return;
         }
     } catch (error) {
-        console.error("Warning: Duplicate check service unavailable.", error);
-        // Optional: You could allow them to proceed if API is down, or block them.
-        // For now, we allow proceeding if offline, but you can add an alert here.
+        // proceed if API unavailable
     }
 
-    onAddClient(newClient);
+    onAddClient({
+        ...newClient,
+        tenantId: '' // FIXED: Added placeholder tenantId to satisfy type requirements
+    });
     setNewClient({ name: '', email: '', phone: '', address: '' });
     setIsAddClientModalOpen(false);
   };
@@ -91,6 +81,7 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
         age: Number(newPatient.age),
         gender: newPatient.gender as 'Male' | 'Female',
         ownerId: selectedClientId,
+        tenantId: '', // FIXED: Added placeholder tenantId
         allergies: newPatient.allergies ? newPatient.allergies.split(',').map(s => s.trim()) : [],
         type: 'Single',
         color: newPatient.color || 'Unknown',
@@ -102,33 +93,25 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
     setIsAddPatientModalOpen(false);
   };
 
-  // --- DELETE CLIENT ---
   const handleDeleteClient = async () => {
       if (!selectedClientId || !selectedClient) return;
-
-      const confirm = window.confirm(
-          `Are you sure you want to delete ${selectedClient.name}?\n\nThis action cannot be undone.`
-      );
-
+      const confirm = window.confirm(`Are you sure you want to delete ${selectedClient.name}?\n\nThis action cannot be undone.`);
       if (confirm) {
           try {
               await api.delete(`/owners/${selectedClientId}`);
               alert("Client deleted successfully.");
               setSelectedClientId(null);
-              if (onRefresh) onRefresh(); // Trigger parent refresh if provided
-              else window.location.reload(); // Fallback reload
+              if (onRefresh) onRefresh(); else window.location.reload();
           } catch (e: any) {
               alert(e.response?.data?.error || "Failed to delete client. Ensure they have no pets first.");
           }
       }
   };
 
-  // --- DETAIL VIEW ---
   if (selectedClientId && selectedClient) {
     const clientPets = pets.filter(p => p.ownerId === selectedClientId);
     const clientSales = sales.filter(s => s.clientId === selectedClientId);
     const clientComms = communications; 
-    
     const totalSpent = clientSales.filter(s => s.status === 'Paid').reduce((sum, s) => sum + s.total, 0);
     
     return (
@@ -144,7 +127,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                     <span className="font-semibold text-lg">Back to Registry</span>
                 </button>
 
-                {/* DELETE BUTTON */}
                 <button 
                     onClick={handleDeleteClient}
                     className="flex items-center text-rose-500 hover:text-white hover:bg-rose-500 px-4 py-2 rounded-xl transition-all border border-rose-100 hover:border-rose-500"
@@ -233,7 +215,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-white/30">
-                        
                         {/* 1. PATIENTS TAB */}
                         {activeTab === 'patients' && (
                             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -320,7 +301,7 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                             </div>
                         )}
 
-                        {/* 4. NEW: USER LOGIN MANAGEMENT TAB */}
+                        {/* 4. LOGIN MANAGEMENT TAB */}
                         {activeTab === 'login' && (
                             <div className="max-w-2xl mx-auto animate-fade-in-up space-y-8">
                                 <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
@@ -375,7 +356,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                 </div>
             </div>
             
-            {/* Modal for Patients (Existing Code) */}
              <Modal open={isAddPatientModalOpen} onClose={() => setIsAddPatientModalOpen(false)} title={`New Patient for ${selectedClient.name}`}>
                  <form onSubmit={handleSavePatient} className="space-y-5">
                     <Input label="Pet Name" required value={newPatient.name} onChange={e => setNewPatient({...newPatient, name: e.target.value})} placeholder="e.g. Bella" />
@@ -411,7 +391,7 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
     );
   }
 
-  // --- LIST VIEW (UNCHANGED, just ensuring imports match) ---
+  // --- LIST VIEW ---
   return (
     <div className="bg-white/50 backdrop-blur-xl rounded-[2rem] shadow-2xl shadow-slate-200/60 border border-white/60 flex flex-col h-[calc(100vh-6rem)] overflow-hidden relative">
         <div className="p-8 pb-4 flex flex-col md:flex-row justify-between items-center gap-6 z-20 relative">
@@ -459,7 +439,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                         className="group relative bg-white rounded-2xl p-4 grid grid-cols-12 items-center gap-4 border border-slate-100 shadow-sm cursor-pointer hover:shadow-2xl hover:shadow-rose-500/10 hover:scale-[1.01] hover:z-10 hover:border-rose-100 transition-all duration-300 ease-spring"
                         style={{ animation: `fadeInUp 0.4s ease-out forwards ${index * 0.05}s`, opacity: 0 }}
                     >
-                        {/* (CONTENT SAME AS BEFORE) */}
                         <div className="col-span-3 flex items-center pl-2">
                             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-50 to-rose-100 text-rose-600 flex items-center justify-center font-bold text-lg shadow-sm border border-rose-100 group-hover:scale-110 transition-transform duration-300">
                                 {owner.name.charAt(0)}

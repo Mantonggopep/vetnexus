@@ -172,6 +172,16 @@ const App: React.FC = () => {
       setIsLoading(true);
       try {
           const { data } = await AuthService.login({ email, password });
+          
+          // --- DEBUGGING LOGS (Check Console F12) ---
+          console.log("--------------------------------");
+          console.log("LOGIN DEBUG INFO:");
+          console.log("Email:", data.user.email);
+          console.log("Roles from Server:", data.user.roles);
+          console.log("Is SuperAdmin?", data.user.roles.includes('SuperAdmin'));
+          console.log("--------------------------------");
+          // ------------------------------------------
+
           setAppState(prev => ({
               ...prev,
               currentUser: data.user,
@@ -180,7 +190,7 @@ const App: React.FC = () => {
           }));
           
           if (data.user.roles.includes('SuperAdmin')) {
-              // Admin logic handled by conditional render
+              // SuperAdmin stays on their dashboard, we don't fetch clinic data
           } else {
               await fetchAllData();
           }
@@ -353,6 +363,7 @@ const App: React.FC = () => {
       return <Auth onLogin={handleLogin} onSignup={handleSignup} plans={appState.subscriptionPlans} />;
   }
 
+  // --- ROUTING LOGIC ---
   if (appState.currentUser.roles.includes('SuperAdmin')) {
       return <SuperAdminDashboard appState={appState} onUpdateTenant={()=>{}} onCreateTenant={()=>{}} onUpdatePlan={handleUpdateSubscriptionPlan} onUpdateTicket={handleUpdateTicket} onLogout={handleLogout} />;
   }

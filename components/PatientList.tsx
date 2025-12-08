@@ -2,16 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Pet, Owner, Species, MedicalNote } from '../types'; 
 import { Search, Filter, ChevronRight, Plus, Stethoscope, User, AlertCircle, Activity } from 'lucide-react';
 import PatientDetail from './PatientDetail'; 
-import { PatientService, OwnerService } from '../services/api'; // <--- UPDATED IMPORT
+import { PatientService, OwnerService } from '../services/api'; 
 
-const PatientList: React.FC = () => {
+const PatientList: React.FC<{ pets: Pet[]; owners: Owner[]; onSelectPatient: (id: string) => void; onAddPatient: (petData: any) => Promise<void>; }> = ({ pets, owners, onSelectPatient, onAddPatient }) => {
   // --- 1. Data State ---
-  const [pets, setPets] = useState<Pet[]>([]);
-  const [owners, setOwners] = useState<Owner[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-
+  // Using props instead of internal state fetch to match App.tsx structure
+  
   // --- 2. View State ---
-  const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
 
   // --- 3. Filter/Search State ---
@@ -35,44 +32,10 @@ const PatientList: React.FC = () => {
       medicalConditions: ''
   });
 
-  // --- API Integrations ---
-  
-  const refreshData = async () => {
-    setIsLoading(true);
-    try {
-        // Fetch Pets and Owners in parallel
-        const [petsRes, ownersRes] = await Promise.all([
-            PatientService.getAll(),
-            OwnerService.getAll()
-        ]);
-        
-        // Axios returns data in .data property
-        setPets(Array.isArray(petsRes.data) ? petsRes.data : []);
-        setOwners(Array.isArray(ownersRes.data) ? ownersRes.data : []);
-        
-    } catch (error) {
-        console.error("Failed to fetch registry data", error);
-    } finally {
-        setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    refreshData();
-  }, []);
-
   // --- Handlers ---
 
   const handleSelectPatient = (id: string) => {
-    setIsAnimating(true);
-    setSelectedPetId(id);
-    setTimeout(() => setIsAnimating(false), 300);
-  };
-
-  const handleBackToList = () => {
-    setIsAnimating(true);
-    setSelectedPetId(null);
-    setTimeout(() => setIsAnimating(false), 300);
+    onSelectPatient(id);
   };
 
   const handleSavePatient = async (e: React.FormEvent) => {
@@ -83,45 +46,26 @@ const PatientList: React.FC = () => {
       const newPetPayload = {
           tenantId: selectedOwner.tenantId || 'system', 
           name: formData.name,
-          species: formData.species as Species,
+          species: formData.species as Species, // Ensure cast is correct
           breed: formData.breed,
           age: Number(formData.age),
           gender: formData.gender as 'Male' | 'Female',
           ownerId: selectedOwner.id,
           type: formData.type as 'Single' | 'Herd',
           color: formData.color,
-          // Convert comma-separated strings to arrays
           allergies: formData.allergies ? formData.allergies.split(',').map(s => s.trim()) : [],
           medicalConditions: formData.medicalConditions ? formData.medicalConditions.split(',').map(s => s.trim()) : [],
-          // Default placeholder image if none provided
           imageUrl: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&q=80&w=200',
-          // Initial weight -> becomes first entry in vitals history
           initialWeight: formData.initialWeight ? Number(formData.initialWeight) : 0
       };
 
       try {
-        const response = await PatientService.create(newPetPayload);
-        
-        // Optimistic update using server response
-        setPets([response.data, ...pets]);
+        await onAddPatient(newPetPayload);
         handleCloseModal();
       } catch (error) {
         console.error("Failed to save patient", error);
         alert("Failed to create patient. Please check your connection.");
       }
-  };
-
-  const handleAddNote = async (petId: string, note: MedicalNote) => {
-    // Note: You might need to add addNote to PatientService in api.ts
-    // await PatientService.addNote(petId, note);
-
-    // Local Optimistic Update
-    setPets(prevPets => prevPets.map(p => {
-        if (p.id === petId) {
-            return { ...p, notes: [...(p.notes || []), note] };
-        }
-        return p;
-    }));
   };
 
   const handleCloseModal = () => {
@@ -150,28 +94,6 @@ const PatientList: React.FC = () => {
       o.clientNumber?.toLowerCase().includes(ownerSearch.toLowerCase())
   );
 
-  // --- VIEW RENDERER ---
-
-  // 1. Detail View
-  if (selectedPetId) {
-      const selectedPet = pets.find(p => p.id === selectedPetId);
-      const owner = owners.find(o => o.id === selectedPet?.ownerId);
-      
-      if (selectedPet) {
-          return (
-              <div className="animate-fade-in-up h-full">
-                  <PatientDetail 
-                      pet={selectedPet} 
-                      owner={owner} 
-                      onBack={handleBackToList}
-                      onAddNote={handleAddNote}
-                  />
-              </div>
-          );
-      }
-  }
-
-  // 2. List View (Default)
   return (
     <>
       <style>{`
@@ -199,7 +121,7 @@ const PatientList: React.FC = () => {
           <div className="flex flex-col">
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Patient Registry</h2>
             <span className="text-xs font-medium text-slate-500 mt-0.5">
-                {isLoading ? 'Loading...' : `${filteredPets.length} Active Records`}
+                {filteredPets.length} Active Records
             </span>
           </div>
           
@@ -327,22 +249,14 @@ const PatientList: React.FC = () => {
               </tbody>
           </table>
           
-          {/* Empty State / Loading State */}
+          {/* Empty State */}
           {filteredPets.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center p-12">
-                  <div className={`w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6 border border-slate-100 shadow-inner ${isLoading ? 'animate-pulse' : ''}`}>
-                      {isLoading ? (
-                         <div className="w-8 h-8 border-4 border-slate-300 border-t-[rgb(var(--ios-primary))] rounded-full animate-spin"></div>
-                      ) : (
-                         <Search className="w-8 h-8 text-slate-300" />
-                      )}
+                  <div className={`w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6 border border-slate-100 shadow-inner`}>
+                      <Search className="w-8 h-8 text-slate-300" />
                   </div>
-                  <h3 className="text-lg font-bold text-slate-700">
-                      {isLoading ? 'Loading Registry...' : 'No Patients Found'}
-                  </h3>
-                  <p className="text-sm mt-1 max-w-xs mx-auto text-slate-400">
-                      {isLoading ? 'Syncing data with the server.' : 'Add a new patient or adjust your search filters.'}
-                  </p>
+                  <h3 className="text-lg font-bold text-slate-700">No Patients Found</h3>
+                  <p className="text-sm mt-1 max-w-xs mx-auto text-slate-400">Add a new patient or adjust your search filters.</p>
               </div>
           )}
         </div>
@@ -430,8 +344,9 @@ const PatientList: React.FC = () => {
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="block text-xs font-bold text-slate-500 ml-1">Species</label>
+                                    {/* FIXED: TS2322 - Ensured value matches Species enum */}
                                     <select className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:bg-white focus:ring-2 focus:ring-[rgb(var(--ios-primary))] transition-all"
-                                        value={formData.species} onChange={e => setFormData({...formData, species: e.target.value})}>
+                                        value={formData.species} onChange={e => setFormData({...formData, species: e.target.value as Species})}>
                                         {Object.values(Species).map(s => <option key={s} value={s}>{s}</option>)}
                                     </select>
                                 </div>

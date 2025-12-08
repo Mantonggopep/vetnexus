@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:match*",
+      "destination": "https://vetnexus-backend.onrender.com/api/:match*"
+    }
+  ]
+}

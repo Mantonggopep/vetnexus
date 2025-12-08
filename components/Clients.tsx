@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Owner, Pet, SaleRecord, CommunicationLog, Species } from '../types';
 import { Search, Mail, Phone, MapPin, ChevronRight, ArrowLeft, Plus, MessageSquare, PawPrint, X, Calendar, User, DollarSign } from 'lucide-react';
 import { formatCurrency } from '../utils/uiUtils';
-import { OwnerService, PatientService, SaleService } from '../services/api'; // Ensure these match your API file
+import { OwnerService, PatientService, SaleService } from '../services/api'; 
 
 interface ClientsProps {
-  // We can still accept props for initial data or fallback, 
-  // but we will primarily manage state internally like PatientList
+  // We accept currency, but data is now managed internally for stability
   currency?: string;
 }
 
@@ -44,6 +43,7 @@ const Clients: React.FC<ClientsProps> = ({ currency = 'USD' }) => {
               PatientService.getAll(),
               SaleService.getAll()
           ]);
+          // Safe data setting
           setOwners(Array.isArray(ownersRes.data) ? ownersRes.data : []);
           setPets(Array.isArray(petsRes.data) ? petsRes.data : []);
           setSales(Array.isArray(salesRes.data) ? salesRes.data : []);
@@ -90,7 +90,7 @@ const Clients: React.FC<ClientsProps> = ({ currency = 'USD' }) => {
       if (!selectedClientId || !newPatient.name) return;
 
       const payload = {
-          tenantId: 'system', // or current tenant
+          tenantId: 'system', 
           name: newPatient.name,
           species: newPatient.species as Species,
           breed: newPatient.breed,
@@ -136,7 +136,7 @@ const Clients: React.FC<ClientsProps> = ({ currency = 'USD' }) => {
       return (
           <div className="animate-fade-in-up h-full flex flex-col">
               {/* Navigation Bar */}
-              <div className="bg-white/80 backdrop-blur-xl border-b border-slate-100 p-4 flex justify-between items-center rounded-t-[32px]">
+              <div className="bg-white/80 backdrop-blur-xl border-b border-slate-100 p-4 flex justify-between items-center rounded-t-[32px] sticky top-0 z-20">
                    <button 
                       onClick={handleBackToList}
                       className="flex items-center text-slate-500 hover:text-slate-800 transition-colors px-3 py-2 rounded-xl hover:bg-slate-100"

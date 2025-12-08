@@ -51,7 +51,7 @@ app.register(cookie, {
 // Prefix all with /api
 app.register(async (api) => {
     api.register(authRoutes);
-    api.register(adminRoutes);
+    api.register(adminRoutes); // Make sure this file has the GET /plans route!
     api.register(userRoutes);
     api.register(clinicalRoutes);
     api.register(inventoryRoutes);
@@ -72,9 +72,11 @@ const start = async () => {
     console.log("✅ Connected to Database");
 
     // 2. Seed Plans
+    // This is the CRITICAL part that fixes your empty plans issue
     for (const p of DEFAULT_PLANS) {
         await prisma.plan.upsert({ where: { id: p.id }, update: p, create: p });
     }
+    console.log("✅ Plans Seeded");
 
     // 3. Seed Super Admin
     const systemTenant = await prisma.tenant.upsert({ 
@@ -84,19 +86,22 @@ const start = async () => {
     });
 
     const adminEmail = 'mantonggopep@gmail.com';
-    const hashedPassword = await bcrypt.hash('12doctor12', 10);
+    // Check if admin exists to avoid re-hashing password every restart
+    const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail }});
     
-    await prisma.user.upsert({
-        where: { email: adminEmail },
-        update: { tenantId: systemTenant.id },
-        create: { 
-            tenantId: systemTenant.id, 
-            name: 'Super Admin', 
-            email: adminEmail, 
-            passwordHash: hashedPassword, 
-            roles: JSON.stringify(['SuperAdmin']) 
-        }
-    });
+    if (!existingAdmin) {
+        const hashedPassword = await bcrypt.hash('12doctor12', 10);
+        await prisma.user.create({
+            data: { 
+                tenantId: systemTenant.id, 
+                name: 'Super Admin', 
+                email: adminEmail, 
+                passwordHash: hashedPassword, 
+                roles: JSON.stringify(['SuperAdmin']) 
+            }
+        });
+        console.log("✅ Super Admin Created");
+    }
 
     // 4. Listen on 0.0.0.0 (Required for Render)
     await app.listen({ port: PORT, host: '0.0.0.0' });

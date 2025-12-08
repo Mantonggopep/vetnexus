@@ -1,9 +1,13 @@
 import axios from 'axios';
 
 // --- CONFIGURATION ---
-// 1. In Production (Vercel): This uses the VITE_API_URL env var.
-// 2. In Development (Local): This falls back to http://localhost:4000/api
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+// 1. In Production (Vercel): Use relative path '/api'. 
+//    Vercel's "rewrites" (in vercel.json) will forward this to Render.
+//    This allows cookies to work correctly (Same-Site).
+// 2. In Development (Local): Fall back to localhost.
+const baseURL = import.meta.env.MODE === 'production' 
+  ? '/api' 
+  : 'http://localhost:4000/api';
 
 console.log("API Configured to:", baseURL);
 
@@ -18,6 +22,10 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Better error logging
+    if (error.response?.status === 401) {
+        console.warn("Unauthorized request - User may need to log in again.");
+    }
     const message = error.response?.data?.error || error.message || 'An unexpected error occurred';
     return Promise.reject({ ...error, message });
   }

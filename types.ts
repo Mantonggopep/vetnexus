@@ -1,5 +1,3 @@
-// C:\USERS\ADMIN\DESKTOP\VET NEXUS PRO\types.ts
-
 export enum Species {
   Dog = 'Dog',
   Cat = 'Cat',
@@ -30,6 +28,22 @@ export interface UserProfile {
   avatarUrl?: string;
 }
 
+export interface ClinicSettings {
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  taxRate: number;
+  currency: string;
+  bankDetails: string;
+  clientPrefix: string;
+  invoicePrefix: string;
+  receiptPrefix: string;
+  patientPrefix: string;
+  clinicName?: string; // Add this optional field to fix POS.tsx error
+}
+
 export interface Tenant {
   id: string;
   parentId?: string | null;
@@ -40,7 +54,9 @@ export interface Tenant {
   status?: 'Active' | 'Suspended' | 'Pending' | 'Expired' | 'Restricted';
   joinedDate?: string;
   nextBillingDate?: string;
-  storageUsed: number; // MB
+  storageUsed: number;
+  userCount?: number; // Fix SuperAdminDashboard error
+  patientCount?: number; // Fix SuperAdminDashboard error
 }
 
 export interface PlanLimits {
@@ -216,7 +232,7 @@ export interface Pet {
   type: 'Single' | 'Herd';
   color: string;
   medicalConditions: string[];
-  
+  initialWeight?: number; // Fix Clients.tsx error
   vaccinations?: VaccinationRecord[]; 
   reminders?: Reminder[]; 
 }
@@ -332,21 +348,6 @@ export interface Expense {
     notes?: string;
 }
 
-export interface ClinicSettings {
-  name: string;
-  address: string;
-  phone: string;
-  email: string;
-  website: string;
-  taxRate: number;
-  currency: string;
-  bankDetails: string;
-  clientPrefix: string;
-  invoicePrefix: string;
-  receiptPrefix: string;
-  patientPrefix: string;
-}
-
 export interface LogEntry {
   id: string;
   tenantId: string;
@@ -382,7 +383,8 @@ export type ViewType =
   | 'reports' 
   | 'logs' 
   | 'settings'
-  | 'expenses';
+  | 'expenses'
+  | 'superadmin';
 
 export interface AppState {
   currentUser: UserProfile | null;
@@ -401,4 +403,5 @@ export interface AppState {
   supportTickets: SupportTicket[];
   expenses: Expense[];
   branches?: Tenant[];
+  currency?: string; // Add this to AppState to fix App.tsx error
 }

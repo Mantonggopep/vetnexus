@@ -16,7 +16,6 @@ import { aiRoutes } from './routes/ai.routes';
 
 const app: FastifyInstance = Fastify({ 
   logger: process.env.NODE_ENV !== 'production',
-  // Increase payload limit if you are uploading images/files
   bodyLimit: 1048576 * 10 // 10MB
 });
 
@@ -25,37 +24,42 @@ const PORT = parseInt(process.env.PORT || '4000');
 // --- PLUGINS ---
 app.register(helmet, { contentSecurityPolicy: false, global: true });
 
-// --- CRITICAL CORS FIX ---
+// --- UPDATED CORS CONFIGURATION ---
 app.register(cors, {
   origin: (origin, cb) => {
-    const allowedOrigins = [
-      'http://localhost:5173', 
-      'http://localhost:4173', 
-      'https://vetnexuspro.vercel.app', // Hardcoded to ensure Vercel works
-      process.env.CLIENT_URL // Fallback from env vars
-    ];
-
-    // Remove undefined/null and normalize (remove trailing slashes)
-    const cleanOrigins = allowedOrigins
-      .filter((url): url is string => !!url)
-      .map(url => url.replace(/\/$/, ''));
-
-    // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+    // 1. Allow mobile apps or non-browser tools (no origin)
     if (!origin) return cb(null, true);
 
-    if (cleanOrigins.includes(origin)) {
+    // 2. Define strict allowed origins (Localhost + Main Production Domain)
+    const allowedExact = [
+      'http://localhost:5173', 
+      'http://localhost:4173', 
+      'https://vetnexuspro.vercel.app', 
+      process.env.CLIENT_URL?.replace(/\/$/, '') // Remove trailing slash if present
+    ].filter(Boolean);
+
+    // 3. Check Exact Match
+    if (allowedExact.includes(origin)) {
       return cb(null, true);
     }
 
-    // Development fallback: Allow all if not in production
+    // 4. ✅ FIX: Allow ALL Vercel Preview URLs (Dynamic)
+    // This allows https://vetnexuspro-git-main... etc.
+    if (origin.endsWith('.vercel.app')) {
+      return cb(null, true);
+    }
+
+    // 5. Dev Mode fallback
     if (process.env.NODE_ENV !== 'production') {
+      console.log(`⚠️ Dev CORS Allowed: ${origin}`);
       return cb(null, true);
     }
 
-    console.warn(`Blocked CORS request from: ${origin}`);
+    // Block everything else
+    console.warn(`🚫 Blocked CORS request from: ${origin}`);
     return cb(new Error("Not allowed by CORS"), false);
   },
-  credentials: true, // REQUIRED for cookies/sessions to work
+  credentials: true, // Required for Cookies/Auth Headers
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 });
@@ -67,9 +71,8 @@ app.register(cookie, {
 });
 
 // --- REGISTER ROUTES ---
-// Prefix all with /api
 app.register(async (api) => {
-    // Health Check Endpoint (useful for Render to know app is alive)
+    // Health Check
     api.get('/health', async () => { return { status: 'ok', timestamp: new Date() } });
 
     api.register(authRoutes);
@@ -87,24 +90,23 @@ const start = async () => {
     if (!process.env.JWT_SECRET) console.warn("⚠️ WARNING: JWT_SECRET not set.");
     if (!process.env.DATABASE_URL) console.warn("⚠️ WARNING: DATABASE_URL not set.");
 
-    // 1. Connect to DB first
     await prisma.$connect();
     console.log("✅ Connected to Database");
 
-    // 2. Seed Plans
+    // Seed Plans
     for (const p of DEFAULT_PLANS) {
         await prisma.plan.upsert({ where: { id: p.id }, update: p, create: p });
     }
     console.log("✅ Plans Seeded");
 
-    // 3. Seed Super Admin
+    // Seed System Tenant & Super Admin
     const systemTenant = await prisma.tenant.upsert({ 
         where: { id: 'system' }, 
         update: {}, 
         create: { id: 'system', name: 'System Admin', plan: 'Enterprise', settings: '{}', storageUsed: 0 } 
     });
 
-    const adminEmail = 'mantonggopep@gmail.com';
+    const adminEmail = 'mantonggopep@gmail.com'; // Change this if needed
     const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail }});
     
     if (!existingAdmin) {
@@ -121,13 +123,10 @@ const start = async () => {
         console.log("✅ Super Admin Created");
     }
 
-    // 4. Listen on 0.0.0.0 (Required for Render)
     await app.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`🌐 Accepting requests from: https://vetnexuspro.vercel.app`);
 
   } catch (err) { 
-    app.log.error(err);
     console.error("🔥 FAILED TO START SERVER:", err); 
     process.exit(1); 
   }

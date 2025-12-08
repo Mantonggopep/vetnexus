@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Owner, Pet, SaleRecord, CommunicationLog, Species } from '../types';
-import { Search, Mail, Phone, MapPin, ChevronRight, UserPlus, ArrowLeft, Plus, DollarSign, MessageSquare, PawPrint, AlertTriangle, X, Calendar } from 'lucide-react';
+import { Search, Mail, Phone, MapPin, ChevronRight, ArrowLeft, Plus, MessageSquare, PawPrint, X, Calendar } from 'lucide-react';
 import { formatCurrency } from '../utils/uiUtils';
 
 interface ClientsProps {
   owners: Owner[];
   pets: Pet[];
   sales: SaleRecord[]; 
-  // Added optional prop for communications to replace mock data
   communications?: CommunicationLog[];
   currency: string;
   onAddClient: (client: Omit<Owner, 'id' | 'clientNumber'>) => void;
@@ -30,18 +29,20 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
 
   const filteredOwners = owners.filter(owner => 
     owner.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    owner.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (owner.email && owner.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
     owner.phone.includes(searchTerm) ||
-    owner.clientNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+    (owner.clientNumber && owner.clientNumber.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const selectedClient = owners.find(o => o.id === selectedClientId);
 
   // Animation trigger
   useEffect(() => {
-    setIsAnimating(true);
-    const timer = setTimeout(() => setIsAnimating(false), 400);
-    return () => clearTimeout(timer);
+    if (selectedClientId) {
+        setIsAnimating(true);
+        const timer = setTimeout(() => setIsAnimating(false), 400);
+        return () => clearTimeout(timer);
+    }
   }, [selectedClientId]);
 
   const handleSaveClient = (e: React.FormEvent) => {
@@ -74,24 +75,18 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
     setIsAddPatientModalOpen(false);
   };
 
-  // --- DETAIL VIEW ---
+  // --- 1. DETAIL VIEW RENDER ---
   if (selectedClientId && selectedClient) {
     const clientPets = pets.filter(p => p.ownerId === selectedClientId);
     const clientSales = sales.filter(s => s.clientId === selectedClientId);
-    // Filter communications for this client only (if backend provides all, otherwise assume parent filtered it)
-    // For now, assuming empty array or passed props:
     const clientComms = communications; 
     
     const totalSpent = clientSales.filter(s => s.status === 'Paid').reduce((sum, s) => sum + s.total, 0);
-    const outstandingDebt = clientSales.filter(s => s.status === 'Pending').reduce((sum, s) => {
-        const paid = s.payments.reduce((pSum, p) => pSum + p.amount, 0);
-        return sum + (s.total - paid);
-    }, 0);
     
     return (
-        <div className={`flex flex-col h-[calc(100vh-6rem)] transition-all duration-500 ease-out ${isAnimating ? 'opacity-0 translate-y-8 scale-95' : 'opacity-100 translate-y-0 scale-100'}`}>
+        <div className={`flex flex-col h-full overflow-hidden transition-all duration-500 ease-out ${isAnimating ? 'opacity-0 translate-y-8 scale-95' : 'opacity-100 translate-y-0 scale-100'}`}>
              {/* Detail Header */}
-             <div className="flex items-center justify-between mb-6">
+             <div className="flex items-center justify-between mb-4 shrink-0">
                 <button 
                     onClick={() => setSelectedClientId(null)} 
                     className="group flex items-center text-slate-500 hover:text-slate-800 transition-all duration-200 px-4 py-2 rounded-xl hover:bg-white hover:shadow-sm"
@@ -103,15 +98,12 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                 </button>
             </div>
 
-            <div className="flex-1 grid grid-cols-12 gap-8 overflow-hidden">
+            <div className="flex-1 grid grid-cols-12 gap-6 overflow-hidden pb-6">
                 {/* Left: Profile Card */}
                 <div className="col-span-12 md:col-span-4 lg:col-span-3 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
                     <div className="bg-white/90 backdrop-blur-xl rounded-[2rem] p-8 border border-rose-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group hover:shadow-2xl hover:shadow-rose-500/10 transition-all duration-500">
-                        {/* Navy Gradient Background Blob */}
                         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-slate-900/10 to-transparent z-0"></div>
-                        
                         <div className="relative z-10 flex flex-col items-center text-center">
-                            {/* Rose Gold Avatar */}
                             <div className="w-28 h-28 rounded-full bg-gradient-to-br from-rose-100 to-rose-200 flex items-center justify-center text-rose-600 text-4xl font-bold shadow-2xl shadow-rose-500/20 ring-4 ring-white mb-4 transform group-hover:scale-105 transition-transform duration-500">
                                 {selectedClient.name.charAt(0)}
                             </div>
@@ -120,7 +112,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                                 <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-mono font-medium border border-slate-200">
                                     {selectedClient.clientNumber}
                                 </span>
-                                {/* Army Green Status */}
                                 <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200">
                                     Active
                                 </span>
@@ -151,7 +142,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                             <span className="text-xl font-bold text-slate-800">{formatCurrency(totalSpent, currency)}</span>
                          </div>
                          <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                             {/* Navy Blue Progress Bar */}
                              <div className="bg-slate-900 h-full rounded-full" style={{ width: '75%' }}></div>
                          </div>
                     </div>
@@ -159,7 +149,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
 
                 {/* Right: Tabs & Data */}
                 <div className="col-span-12 md:col-span-8 lg:col-span-9 flex flex-col h-full bg-white/60 backdrop-blur-xl rounded-[2.5rem] border border-white/60 shadow-2xl shadow-slate-200/50 overflow-hidden">
-                    {/* Tab Navigation */}
                     <div className="px-8 py-5 border-b border-rose-100/50 flex justify-between items-center bg-white/40 sticky top-0 z-20 backdrop-blur-md">
                         <div className="flex space-x-1 bg-slate-100/50 p-1.5 rounded-2xl">
                              {(['patients', 'financials', 'communication'] as const).map((tab) => (
@@ -187,7 +176,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                         )}
                     </div>
 
-                    {/* Content */}
                     <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-white/30">
                         {activeTab === 'patients' && (
                             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -197,9 +185,7 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                                         className="bg-white p-5 rounded-[2rem] border border-rose-50 shadow-sm hover:shadow-2xl hover:shadow-rose-500/10 hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative overflow-hidden"
                                         style={{ animation: `fadeInUp 0.5s ease-out forwards ${idx * 0.1}s`, opacity: 0 }}
                                     >
-                                        {/* Rose Gold Corner Decoration */}
                                         <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-bl-[4rem] -mr-8 -mt-8 transition-all group-hover:bg-rose-100"></div>
-                                        
                                         <div className="flex items-center space-x-4 mb-4 relative z-10">
                                             <img 
                                                 src={pet.imageUrl || `https://ui-avatars.com/api/?name=${pet.name}&background=random`} 
@@ -211,7 +197,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                                                 <p className="text-sm font-medium text-emerald-700">{pet.breed}</p>
                                             </div>
                                         </div>
-                                        
                                         <div className="grid grid-cols-3 gap-2 mt-4 relative z-10">
                                             <div className="bg-slate-50 p-2 rounded-xl text-center">
                                                 <span className="block text-xs text-slate-400 font-bold uppercase">Age</span>
@@ -281,22 +266,15 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                                         {idx !== clientComms.length - 1 && (
                                             <div className="absolute top-10 left-5 w-0.5 h-full bg-slate-100 -z-10"></div>
                                         )}
-                                        
-                                        <div className={`
-                                            w-10 h-10 rounded-full flex items-center justify-center text-white shadow-md ring-4 ring-white
-                                            ${comm.type === 'Call' ? 'bg-slate-900' : comm.type === 'Email' ? 'bg-rose-400' : 'bg-emerald-600'}
-                                        `}>
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-md ring-4 ring-white ${comm.type === 'Call' ? 'bg-slate-900' : comm.type === 'Email' ? 'bg-rose-400' : 'bg-emerald-600'}`}>
                                             {comm.type === 'Call' ? <Phone className="w-4 h-4"/> : comm.type === 'Email' ? <Mail className="w-4 h-4"/> : <MessageSquare className="w-4 h-4"/>}
                                         </div>
-                                        
                                         <div className="flex-1 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
                                             <div className="flex justify-between items-start mb-2">
                                                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{comm.type}</span>
                                                 <span className="text-xs text-slate-400 font-mono">{comm.date}</span>
                                             </div>
                                             <p className="text-slate-700 font-medium leading-relaxed">{comm.summary}</p>
-                                            
-                                            {/* FIXED: Changed <p> to <div> to avoid DOM nesting error */}
                                             <div className="text-xs text-slate-400 mt-3 flex items-center">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-rose-400 mr-2"></div>
                                                 Logged by {comm.staffName}
@@ -316,7 +294,6 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                 </div>
             </div>
             
-             {/* Patient Modal */}
              <Modal open={isAddPatientModalOpen} onClose={() => setIsAddPatientModalOpen(false)} title={`New Patient for ${selectedClient.name}`}>
                  <form onSubmit={handleSavePatient} className="space-y-5">
                     <Input label="Pet Name" required value={newPatient.name} onChange={e => setNewPatient({...newPatient, name: e.target.value})} placeholder="e.g. Bella" />
@@ -352,11 +329,11 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
     );
   }
 
-  // --- LIST VIEW (Cards with new Palette) ---
+  // --- 2. LIST VIEW RENDER (Main Page) ---
   return (
-    <div className="bg-white/50 backdrop-blur-xl rounded-[2rem] shadow-2xl shadow-slate-200/60 border border-white/60 flex flex-col h-[calc(100vh-6rem)] overflow-hidden relative">
-        {/* Navy Header */}
-        <div className="p-8 pb-4 flex flex-col md:flex-row justify-between items-center gap-6 z-20 relative">
+    <div className="bg-white/50 backdrop-blur-xl rounded-[2rem] shadow-2xl shadow-slate-200/60 border border-white/60 flex flex-col h-full overflow-hidden relative">
+        {/* Header - NOW FIXED & VISIBLE */}
+        <div className="p-8 pb-4 flex flex-col md:flex-row justify-between items-center gap-6 z-20 relative shrink-0">
             <div>
                 <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-1">Client Registry</h2>
                 <p className="text-slate-500 font-medium">Manage your clinic's clients and patients.</p>
@@ -374,10 +351,9 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                     />
                 </div>
                 <div className="w-px h-8 bg-slate-200 mx-2"></div>
-                {/* Navy Button */}
                 <button 
                     onClick={() => setIsAddClientModalOpen(true)}
-                    className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center transition-all shadow-md hover:scale-105 active:scale-95"
+                    className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center transition-all shadow-md hover:scale-105 active:scale-95 whitespace-nowrap"
                 >
                     <Plus className="w-4 h-4 mr-2" /> Add Client
                 </button>
@@ -385,7 +361,7 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
         </div>
 
         {/* Column Headers */}
-        <div className="grid grid-cols-12 px-8 py-3 mx-4 mt-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+        <div className="grid grid-cols-12 px-8 py-3 mx-4 mt-2 text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 bg-white/20 rounded-xl">
             <div className="col-span-3 pl-4">Client Profile</div>
             <div className="col-span-3 border-l border-slate-200 pl-4">Contact Info</div>
             <div className="col-span-3 border-l border-slate-200 pl-4">Location</div>
@@ -393,7 +369,7 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
             <div className="col-span-1 text-right pr-4"></div>
         </div>
 
-        {/* Floating Rows Container */}
+        {/* Floating Rows Container - FIXED OVERFLOW */}
         <div className="flex-1 overflow-y-auto custom-scrollbar px-8 pb-8 space-y-3">
             {filteredOwners.map((owner, index) => {
                 const ownerPets = pets.filter(p => p.ownerId === owner.id);
@@ -418,7 +394,7 @@ const Clients: React.FC<ClientsProps> = ({ owners, pets, sales, communications =
                             <div className="ml-4">
                                 <h3 className="font-bold text-slate-800 text-sm group-hover:text-rose-600 transition-colors">{owner.name}</h3>
                                 <span className="inline-block mt-1 px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-mono rounded border border-slate-200">
-                                    {owner.clientNumber}
+                                    {owner.clientNumber || 'N/A'}
                                 </span>
                             </div>
                         </div>

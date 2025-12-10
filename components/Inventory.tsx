@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { InventoryItem } from '../types';
-import { Package, Search, Plus, AlertTriangle, AlertCircle, Filter, Edit2, Trash2, Tag, Calendar, DollarSign } from 'lucide-react';
-import SearchableSelect from './SearchableSelect';
-import ToggleSwitch from './ToggleSwitch';
+import { Package, Search, Plus, AlertTriangle, AlertCircle, Filter, Edit2, Tag } from 'lucide-react';
 
 interface InventoryProps {
   items: InventoryItem[];
@@ -21,11 +19,11 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
     name: '',
     category: 'Medicine',
     sku: '',
-    quantity: 0,
+    stock: 0, // FIXED: was quantity
     unit: 'vial',
-    costPrice: 0,
-    sellingPrice: 0,
-    minStockLevel: 5,
+    purchasePrice: 0, // FIXED: was costPrice
+    retailPrice: 0, // FIXED: was sellingPrice
+    reorderLevel: 5, // FIXED: was minStockLevel
     expiryDate: '',
     supplier: '',
     location: '',
@@ -50,14 +48,15 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
         await onAddItem({
           ...formData,
           id: crypto.randomUUID(),
-          lastUpdated: new Date().toISOString()
+          type: 'Product', // Default value
+          wholesalePrice: 0, // Default value
         } as InventoryItem);
       }
       setIsModalOpen(false);
       setEditingItem(null);
       setFormData({
-        name: '', category: 'Medicine', sku: '', quantity: 0, unit: 'vial',
-        costPrice: 0, sellingPrice: 0, minStockLevel: 5, expiryDate: '',
+        name: '', category: 'Medicine', sku: '', stock: 0, unit: 'vial',
+        purchasePrice: 0, retailPrice: 0, reorderLevel: 5, expiryDate: '',
         supplier: '', location: '', batchNumber: ''
       });
     } catch (error) {
@@ -130,7 +129,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredItems.map(item => {
-                const isLowStock = item.quantity <= item.minStockLevel;
+                const isLowStock = item.stock <= item.reorderLevel;
                 const isExpired = item.expiryDate ? new Date(item.expiryDate) < new Date() : false;
                 
                 return (
@@ -147,13 +146,13 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
                     <td className="px-4 py-3">
                       <div className="flex items-center space-x-2">
                         <span className={`font-bold ${isLowStock ? 'text-red-600' : 'text-slate-700'}`}>
-                          {item.quantity} {item.unit}
+                          {item.stock} {item.unit}
                         </span>
                         {isLowStock && <AlertCircle className="w-4 h-4 text-red-500" />}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-700 font-medium">
-                      {item.sellingPrice.toFixed(2)}
+                      {item.retailPrice.toFixed(2)}
                     </td>
                     <td className="px-4 py-3">
                       {isExpired ? (
@@ -220,7 +219,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
                   <select
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                     value={formData.category}
-                    onChange={e => setFormData({...formData, category: e.target.value})}
+                    onChange={e => setFormData({...formData, category: e.target.value as any})}
                   >
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -237,12 +236,12 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
 
                 <div className="grid grid-cols-2 gap-2">
                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700">Quantity</label>
+                      <label className="text-sm font-medium text-slate-700">Stock</label>
                       <input
                         type="number"
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                        value={formData.quantity}
-                        onChange={e => setFormData({...formData, quantity: Number(e.target.value)})}
+                        value={formData.stock}
+                        onChange={e => setFormData({...formData, stock: Number(e.target.value)})}
                       />
                    </div>
                    <div className="space-y-2">
@@ -257,27 +256,27 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Selling Price</label>
+                  <label className="text-sm font-medium text-slate-700">Retail Price</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{currency === 'NGN' ? '₦' : '$'}</span>
                     <input
                       type="number"
                       className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                      value={formData.sellingPrice}
-                      onChange={e => setFormData({...formData, sellingPrice: Number(e.target.value)})}
+                      value={formData.retailPrice}
+                      onChange={e => setFormData({...formData, retailPrice: Number(e.target.value)})}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Cost Price</label>
+                  <label className="text-sm font-medium text-slate-700">Purchase Price</label>
                   <div className="relative">
                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{currency === 'NGN' ? '₦' : '$'}</span>
                      <input
                       type="number"
                       className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                      value={formData.costPrice}
-                      onChange={e => setFormData({...formData, costPrice: Number(e.target.value)})}
+                      value={formData.purchasePrice}
+                      onChange={e => setFormData({...formData, purchasePrice: Number(e.target.value)})}
                     />
                   </div>
                 </div>
@@ -293,12 +292,12 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
                 </div>
                 
                 <div className="space-y-2">
-                   <label className="text-sm font-medium text-slate-700">Min. Stock Level</label>
+                   <label className="text-sm font-medium text-slate-700">Reorder Level</label>
                    <input
                       type="number"
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                      value={formData.minStockLevel}
-                      onChange={e => setFormData({...formData, minStockLevel: Number(e.target.value)})}
+                      value={formData.reorderLevel}
+                      onChange={e => setFormData({...formData, reorderLevel: Number(e.target.value)})}
                    />
                 </div>
               </div>

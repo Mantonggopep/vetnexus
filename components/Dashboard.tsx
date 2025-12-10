@@ -2,12 +2,12 @@ import React, { useMemo } from 'react';
 import { AppState, AppointmentStatus, ViewType } from '../types';
 import { 
   Calendar, Users, Stethoscope, ShoppingCart, 
-  Package, FlaskConical, FileText, Settings, 
+  Package, FlaskConical, Settings, 
   TrendingUp, AlertTriangle, Clock,
   DollarSign, Activity, Search, Wallet, FileClock, 
   ArrowUpRight, ArrowDownRight, ChevronRight, Sparkles
 } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { getAvatarGradient, formatCurrency } from '../utils/uiUtils';
 
 interface DashboardProps {
@@ -16,7 +16,7 @@ interface DashboardProps {
   onSelectPatient: (id: string) => void;
 }
 
-// --- 1. Helper Components (Optimized Size) ---
+// --- 1. Helper Components ---
 
 // Compact App Icon
 const AppIcon: React.FC<{ icon: React.FC<any>; gradient: string; }> = ({ icon: Icon, gradient }) => {
@@ -49,7 +49,7 @@ const HDStatWidget: React.FC<{
     const finalIsNegative = isNegative !== undefined ? isNegative : !isTrendPositive;
 
     return (
-        <div className={`flex flex-col justify-between p-4 rounded-3xl border ${colors.border} ${colors.bg} backdrop-blur-md shadow-sm hover:shadow-md transition-all duration-300 group`}>
+        <div className={`flex flex-col justify-between p-4 rounded-3xl border ${colors.border} ${colors.bg} backdrop-blur-md shadow-sm hover:shadow-md transition-all duration-300 group min-h-[110px]`}>
             <div className="flex justify-between items-start mb-2">
                 <div className={`p-2 rounded-xl ${colors.icon} text-white shadow-sm group-hover:scale-105 transition-transform`}>
                     <Icon className="w-4 h-4 stroke-[3px]" />
@@ -62,14 +62,14 @@ const HDStatWidget: React.FC<{
                 )}
             </div>
             <div>
-                <h4 className={`text-2xl font-black ${colors.text} tracking-tight`}>{value}</h4>
+                <h4 className={`text-xl md:text-2xl font-black ${colors.text} tracking-tight truncate`}>{value}</h4>
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider opacity-80">{label}</p>
             </div>
         </div>
     );
 };
 
-// Compact Module Card (Resized)
+// Compact Module Card
 const ModuleAppCard: React.FC<{
     title: string;
     desc: string;
@@ -96,11 +96,11 @@ const ModuleAppCard: React.FC<{
         <button 
             onClick={onClick}
             className={`
-                group relative flex flex-col items-center text-center p-3.5 rounded-[1.8rem] 
+                group relative flex flex-col items-center text-center p-3 rounded-[1.8rem] 
                 ${theme.bg} backdrop-blur-xl border ${theme.border}
-                shadow-sm hover:shadow-lg hover:-translate-y-1 hover:scale-[1.02]
+                shadow-sm hover:shadow-lg hover:-translate-y-1 hover:scale-[1.02] active:scale-95
                 transition-all duration-300 ease-out
-                min-h-[130px] justify-center
+                min-h-[120px] justify-center w-full
             `}
         >
             {count !== undefined && count > 0 && (
@@ -163,31 +163,33 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onNavigate, onSelectPatien
   }, [state.currentUser]);
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar bg-cyan-50/40 p-4">
+    // Updated: removed h-full and overflow-y-auto to allow App.tsx to handle scrolling
+    <div className="bg-cyan-50/40 p-2 md:p-4 min-h-full">
       
       {/* Resized max-width and internal padding */}
-      <div className="max-w-[1600px] mx-auto bg-white/40 backdrop-blur-2xl rounded-[2.5rem] p-5 border-[4px] border-white shadow-xl shadow-cyan-900/5">
+      <div className="max-w-[1600px] mx-auto bg-white/40 backdrop-blur-2xl rounded-2xl md:rounded-[2.5rem] p-3 md:p-5 border-2 md:border-[4px] border-white shadow-xl shadow-cyan-900/5">
         
-        <div className="flex flex-col xl:flex-row gap-5">
+        <div className="flex flex-col xl:flex-row gap-4 md:gap-5">
             
             {/* --- LEFT COLUMN (Compact) --- */}
-            <div className="xl:w-[260px] shrink-0 flex flex-col gap-5 animate-slide-up">
+            {/* Added w-full to stack on mobile */}
+            <div className="w-full xl:w-[260px] shrink-0 flex flex-col gap-4 md:gap-5 animate-slide-up">
                 
                 {/* 1. Identity Card */}
-                <div className="bg-gradient-to-br from-cyan-50 via-white to-blue-50 p-5 rounded-3xl border border-white/60 shadow-md">
-                    <div className="flex flex-col items-center text-center gap-3">
-                        <div className={`w-16 h-16 rounded-2xl shadow-lg flex items-center justify-center text-white text-2xl font-black ring-4 ring-white ${getAvatarGradient(state.currentUser?.name || '')}`}>
+                <div className="bg-gradient-to-br from-cyan-50 via-white to-blue-50 p-4 md:p-5 rounded-3xl border border-white/60 shadow-md">
+                    <div className="flex xl:flex-col items-center xl:text-center gap-3">
+                        <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl shadow-lg flex items-center justify-center text-white text-xl md:text-2xl font-black ring-4 ring-white shrink-0 ${getAvatarGradient(state.currentUser?.name || '')}`}>
                             {state.currentUser?.avatarUrl ? (
                                 <img src={state.currentUser.avatarUrl} className="w-full h-full object-cover rounded-2xl" />
                             ) : (
                                 state.currentUser?.name.charAt(0)
                             )}
                         </div>
-                        <div>
+                        <div className="text-left xl:text-center">
                             <h2 className="text-lg font-black text-slate-800 leading-tight">{state.currentUser?.name.split(' ')[0]}</h2>
-                            <p className="text-[10px] font-bold text-cyan-600 uppercase tracking-widest mt-1">{currentTenant?.name}</p>
+                            <p className="text-[10px] font-bold text-cyan-600 uppercase tracking-widest mt-0.5 md:mt-1">{currentTenant?.name}</p>
                             
-                            <div className="mt-2.5 flex justify-center">
+                            <div className="mt-1 md:mt-2.5 flex xl:justify-center">
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 shadow-sm">
                                     <span className="relative flex h-2 w-2">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -200,11 +202,12 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onNavigate, onSelectPatien
                     </div>
                 </div>
 
-                {/* 2. Today's Agenda (Resized) */}
-                <div className="flex-1 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/50 p-5 rounded-3xl border border-white/60 shadow-md flex flex-col relative overflow-hidden min-h-[400px]">
-                    <div className="flex justify-between items-end mb-6 z-10 relative">
+                {/* 2. Today's Agenda */}
+                {/* Updated min-h to be smaller on mobile */}
+                <div className="flex-1 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/50 p-4 md:p-5 rounded-3xl border border-white/60 shadow-md flex flex-col relative overflow-hidden h-[300px] md:min-h-[400px]">
+                    <div className="flex justify-between items-end mb-4 md:mb-6 z-10 relative">
                         <div>
-                            <h3 className="text-4xl font-black text-slate-800 tracking-tighter">{new Date().getDate()}</h3>
+                            <h3 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tighter">{new Date().getDate()}</h3>
                             <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mt-0.5">{new Date().toLocaleString('default', { month: 'long', weekday: 'long' })}</p>
                         </div>
                         <div className="w-10 h-10 rounded-xl bg-white border border-indigo-100 text-indigo-600 flex items-center justify-center shadow-sm">
@@ -212,11 +215,11 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onNavigate, onSelectPatien
                         </div>
                     </div>
 
-                    <div className="absolute left-[2.5rem] top-24 bottom-0 w-[1px] bg-indigo-100 z-0 dashed"></div>
+                    <div className="absolute left-[2.25rem] top-24 bottom-0 w-[1px] bg-indigo-100 z-0 dashed"></div>
 
                     <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-3 z-10">
                         {todayAppointments.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-40 opacity-50">
+                            <div className="flex flex-col items-center justify-center h-full opacity-50 pb-10">
                                 <Clock className="w-8 h-8 text-indigo-300 mb-2"/>
                                 <p className="text-xs font-bold text-indigo-400">No appointments</p>
                             </div>
@@ -232,8 +235,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onNavigate, onSelectPatien
                                         onClick={() => apt.petId && onSelectPatient(apt.petId)}
                                         className={`relative flex items-center group cursor-pointer ${isNext ? 'scale-[1.01] origin-left' : ''} transition-all`}
                                     >
-                                        <div className={`w-14 text-[10px] font-bold text-right mr-5 shrink-0 tabular-nums ${isNext ? 'text-indigo-600' : 'text-slate-400'}`}>{time}</div>
-                                        <div className={`absolute left-[2.25rem] w-2.5 h-2.5 rounded-full border-[2px] z-20 transition-all ${isNext ? 'bg-indigo-500 border-indigo-200' : 'bg-white border-slate-300'}`}></div>
+                                        <div className={`w-14 text-[10px] font-bold text-right mr-4 shrink-0 tabular-nums ${isNext ? 'text-indigo-600' : 'text-slate-400'}`}>{time}</div>
+                                        <div className={`absolute left-[2rem] w-2.5 h-2.5 rounded-full border-[2px] z-20 transition-all ${isNext ? 'bg-indigo-500 border-indigo-200' : 'bg-white border-slate-300'}`}></div>
                                         
                                         <div className={`flex-1 p-2.5 rounded-xl border transition-all shadow-sm group-hover:shadow-md relative overflow-hidden ${isNext ? 'bg-white border-indigo-100 ring-1 ring-indigo-50' : 'bg-white/60 border-transparent hover:bg-white'}`}>
                                             <div className={`absolute left-0 top-0 bottom-0 w-1 ${getAvatarGradient(pet?.name || 'A')}`}></div>
@@ -256,23 +259,23 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onNavigate, onSelectPatien
             </div>
 
             {/* --- CENTER COLUMN (Fluid) --- */}
-            <div className="flex-1 flex flex-col gap-5 animate-slide-up" style={{ animationDelay: '100ms' }}>
+            <div className="flex-1 flex flex-col gap-4 md:gap-5 animate-slide-up" style={{ animationDelay: '100ms' }}>
                 
-                {/* 1. Hero (Reduced Padding) */}
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-50 via-white to-rose-50 p-6 shadow-md border border-teal-50/50 group">
+                {/* 1. Hero */}
+                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-50 via-white to-rose-50 p-4 md:p-6 shadow-md border border-teal-50/50 group">
                     <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
                         <div>
                             <div className="flex items-center gap-2 mb-1">
                                 <Sparkles className="w-4 h-4 text-amber-400 fill-amber-400 animate-pulse" />
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{greetingTime}</span>
                             </div>
-                            <h1 className="text-3xl font-black mb-2 tracking-tight text-slate-800">{displayName}</h1>
+                            <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tight text-slate-800">{displayName}</h1>
                             <p className="text-slate-600 font-medium text-sm md:max-w-md leading-relaxed">
                                 You have <span className="font-bold text-teal-600 bg-teal-50 px-1.5 rounded border border-teal-100">{todayAppointments.length} appointments</span> today. 
                                 {pendingLabs > 0 && <span> <span className="font-bold text-rose-500 bg-rose-50 px-1.5 rounded border border-rose-100">{pendingLabs} labs</span> need review.</span>}
                             </p>
                         </div>
-                        <div>
+                        <div className="flex justify-end">
                             <button 
                                 onClick={() => onNavigate('logs')}
                                 className="flex items-center gap-2 bg-slate-800 text-white px-4 py-3 rounded-xl text-xs font-bold shadow-lg shadow-slate-800/20 hover:scale-105 active:scale-95 transition-all"
@@ -285,8 +288,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onNavigate, onSelectPatien
                     </div>
                 </div>
 
-                {/* 2. Application Grid (Compact) */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {/* 2. Application Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
                     <ModuleAppCard title="Patients" desc="Records" icon={Users} colorTheme="blue" onClick={() => onNavigate('patients')} count={state.pets.length} />
                     <ModuleAppCard title="Consults" desc="Medical" icon={Stethoscope} colorTheme="emerald" onClick={() => onNavigate('treatments')} />
                     <ModuleAppCard title="Schedule" desc="Booking" icon={Calendar} colorTheme="indigo" onClick={() => onNavigate('appointments')} />
@@ -300,9 +303,9 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onNavigate, onSelectPatien
                 </div>
             </div>
 
-            {/* --- RIGHT COLUMN (250px) --- */}
-            <div className="xl:w-[250px] shrink-0 flex flex-col gap-5 animate-slide-up" style={{ animationDelay: '200ms' }}>
-                <div className="flex flex-col gap-4">
+            {/* --- RIGHT COLUMN --- */}
+            <div className="w-full xl:w-[250px] shrink-0 flex flex-col gap-4 md:gap-5 animate-slide-up" style={{ animationDelay: '200ms' }}>
+                <div className="grid grid-cols-2 xl:flex xl:flex-col gap-3 md:gap-4">
                     <HDStatWidget label="Revenue (Today)" value={formatCurrency(todayRevenue, currency)} icon={DollarSign} colorTheme="teal" trendPercent={revenuePercentChange} />
                     <HDStatWidget label="Active Patients" value={state.pets.length.toString()} icon={Users} colorTheme="gold" />
                 </div>

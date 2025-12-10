@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { InventoryItem } from '../types';
-import { Package, Search, Plus, AlertTriangle, AlertCircle, Filter, Edit2, Tag } from 'lucide-react';
+import { Package, Search, Plus, AlertTriangle, AlertCircle, Filter, Edit2 } from 'lucide-react';
 import { formatCurrency } from '../utils/uiUtils';
 
 interface InventoryProps {
@@ -16,7 +16,6 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
-  // CORRECTED STATE: Uses 'stock' instead of 'quantity', 'retailPrice' instead of 'sellingPrice'
   const [formData, setFormData] = useState<Partial<InventoryItem>>({
     name: '',
     category: 'Medicine',
@@ -186,11 +185,10 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
           </table>
           
           {filteredItems.length === 0 && (
-            <div className="text-center py-12">
-              <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 font-medium">No items found</p>
-              <p className="text-sm text-slate-400">Try adjusting your search or add a new item.</p>
-            </div>
+             <div className="text-center py-12">
+               <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+               <p className="text-slate-500 font-medium">No items found</p>
+             </div>
           )}
         </div>
       </div>
@@ -252,7 +250,6 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                         value={formData.unit}
                         onChange={e => setFormData({...formData, unit: e.target.value})}
-                        placeholder="e.g. tablet, vial"
                       />
                    </div>
                 </div>
@@ -305,17 +302,8 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
               </div>
 
               <div className="flex justify-end space-x-3 pt-6 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md transition-all"
-                >
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md">
                   {editingItem ? 'Save Changes' : 'Add Item'}
                 </button>
               </div>

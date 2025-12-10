@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth';
 import { createLog, checkLimits, trackStorage } from '../utils/serverHelpers';
+import bcrypt from 'bcryptjs'; // Required for hashing client passwords
 
 // Helper to handle String -> JSON conversion safely
 const safeParse = (data: string | null, fallback: any = []) => {
@@ -98,7 +99,8 @@ export async function clinicalRoutes(app: FastifyInstance) {
                     email: body.email || null,
                     address: body.address || null,
                     clientNumber: newClientNumber,
-                    createdAt: new Date()
+                    createdAt: new Date(),
+                    isPortalActive: false // Default to inactive
                 }
             });
 
@@ -109,7 +111,7 @@ export async function clinicalRoutes(app: FastifyInstance) {
         }
     });
 
-    // UPDATE OWNER
+    // UPDATE OWNER DETAILS
     app.patch('/owners/:id', { preHandler: [authenticate] }, async (req, reply) => {
         const user = (req as AuthenticatedRequest).user!;
         const { id } = req.params as any;
@@ -126,6 +128,42 @@ export async function clinicalRoutes(app: FastifyInstance) {
                 }
             });
             return reply.send(updated);
+        } catch (e: any) {
+            return reply.status(500).send({ error: e.message });
+        }
+    });
+
+    // --- NEW: MANAGE CLIENT PORTAL ACCESS ---
+    app.patch('/owners/:id/portal', { preHandler: [authenticate] }, async (req, reply) => {
+        const user = (req as AuthenticatedRequest).user!;
+        const { id } = req.params as any;
+        const { password, isActive } = req.body as any;
+
+        try {
+            // Only Staff can do this (User type check is in middleware, but ensuring safety)
+            if (user.type === 'CLIENT') {
+                return reply.status(403).send({ error: "Clients cannot modify portal access." });
+            }
+
+            const updateData: any = { isPortalActive: isActive };
+            
+            if (password) {
+                const hashedPassword = await bcrypt.hash(password, 10);
+                updateData.passwordHash = hashedPassword;
+            }
+
+            const updated = await prisma.owner.update({
+                where: { id, tenantId: user.tenantId },
+                data: updateData
+            });
+
+            await createLog(user.tenantId, user.name, 'Updated Client Portal Access', 'admin', updated.name);
+
+            return reply.send({ 
+                success: true, 
+                isPortalActive: updated.isPortalActive,
+                hasPassword: !!updated.passwordHash
+            });
         } catch (e: any) {
             return reply.status(500).send({ error: e.message });
         }

@@ -41,7 +41,7 @@ export interface ClinicSettings {
   invoicePrefix: string;
   receiptPrefix: string;
   patientPrefix: string;
-  clinicName?: string; // Add this optional field to fix POS.tsx error
+  clinicName?: string;
 }
 
 export interface Tenant {
@@ -55,8 +55,8 @@ export interface Tenant {
   joinedDate?: string;
   nextBillingDate?: string;
   storageUsed: number;
-  userCount?: number; // Fix SuperAdminDashboard error
-  patientCount?: number; // Fix SuperAdminDashboard error
+  userCount?: number;
+  patientCount?: number;
 }
 
 export interface PlanLimits {
@@ -100,6 +100,12 @@ export interface Owner {
   email: string;
   phone: string;
   address: string;
+  
+  // Client Portal Fields
+  isPortalActive?: boolean;
+  passwordHash?: string; // Optional, usually handled securely on backend
+  lastLogin?: string;
+  createdAt?: string;
 }
 
 export interface MedicalNote {
@@ -232,7 +238,7 @@ export interface Pet {
   type: 'Single' | 'Herd';
   color: string;
   medicalConditions: string[];
-  initialWeight?: number; // Fix Clients.tsx error
+  initialWeight?: number; 
   vaccinations?: VaccinationRecord[]; 
   reminders?: Reminder[]; 
 }
@@ -262,6 +268,13 @@ export interface InventoryItem {
   wholesalePrice: number;
   reorderLevel: number;
   expiryDate?: string;
+  
+  // New fields for robust inventory & build fix
+  unit?: string;
+  location?: string;
+  batchNumber?: string;
+  supplier?: string;
+  lastUpdated?: string;
 }
 
 export interface LabResult {
@@ -403,5 +416,5 @@ export interface AppState {
   supportTickets: SupportTicket[];
   expenses: Expense[];
   branches?: Tenant[];
-  currency?: string; // Add this to AppState to fix App.tsx error
+  currency?: string; 
 }

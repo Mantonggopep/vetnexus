@@ -20,7 +20,7 @@ export async function patientRoutes(app: FastifyInstance) {
   app.post('/', async (request, reply) => {
     const { 
       name, species, breed, age, gender, 
-      ownerId, color, initialWeight, allergies 
+      ownerId, color, allergies 
     } = request.body as any;
 
     try {
@@ -34,9 +34,7 @@ export async function patientRoutes(app: FastifyInstance) {
           gender,
           ownerId,
           color,
-          // Ensure these fields exist in your schema.prisma
-          // If initialWeight gives an error, remove it or ensure schema has 'initialWeight Float'
-          initialWeight: initialWeight ? Number(initialWeight) : 0, 
+          // 'initialWeight' removed because it doesn't exist in your Prisma Schema
           allergies: Array.isArray(allergies) ? JSON.stringify(allergies) : (allergies || "[]"),
           imageUrl: `https://ui-avatars.com/api/?name=${name}&background=random`
         }

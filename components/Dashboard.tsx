@@ -163,16 +163,14 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onNavigate, onSelectPatien
   }, [state.currentUser]);
 
   return (
-    // Updated: removed h-full and overflow-y-auto to allow App.tsx to handle scrolling
-    <div className="bg-cyan-50/40 p-2 md:p-4 min-h-full">
+    // UPDATED: Added pb-20 for mobile nav spacing
+    <div className="bg-cyan-50/40 p-2 md:p-4 pb-20 md:pb-4 w-full">
       
-      {/* Resized max-width and internal padding */}
       <div className="max-w-[1600px] mx-auto bg-white/40 backdrop-blur-2xl rounded-2xl md:rounded-[2.5rem] p-3 md:p-5 border-2 md:border-[4px] border-white shadow-xl shadow-cyan-900/5">
         
         <div className="flex flex-col xl:flex-row gap-4 md:gap-5">
             
-            {/* --- LEFT COLUMN (Compact) --- */}
-            {/* Added w-full to stack on mobile */}
+            {/* --- LEFT COLUMN --- */}
             <div className="w-full xl:w-[260px] shrink-0 flex flex-col gap-4 md:gap-5 animate-slide-up">
                 
                 {/* 1. Identity Card */}
@@ -203,7 +201,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onNavigate, onSelectPatien
                 </div>
 
                 {/* 2. Today's Agenda */}
-                {/* Updated min-h to be smaller on mobile */}
                 <div className="flex-1 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/50 p-4 md:p-5 rounded-3xl border border-white/60 shadow-md flex flex-col relative overflow-hidden h-[300px] md:min-h-[400px]">
                     <div className="flex justify-between items-end mb-4 md:mb-6 z-10 relative">
                         <div>
@@ -258,7 +255,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onNavigate, onSelectPatien
                 </div>
             </div>
 
-            {/* --- CENTER COLUMN (Fluid) --- */}
+            {/* --- CENTER COLUMN --- */}
             <div className="flex-1 flex flex-col gap-4 md:gap-5 animate-slide-up" style={{ animationDelay: '100ms' }}>
                 
                 {/* 1. Hero */}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { InventoryItem } from '../types';
 import { Package, Search, Plus, AlertTriangle, AlertCircle, Filter, Edit2, Tag } from 'lucide-react';
+import { formatCurrency } from '../utils/uiUtils';
 
 interface InventoryProps {
   items: InventoryItem[];
@@ -15,15 +16,16 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
+  // CORRECTED STATE: Uses 'stock' instead of 'quantity', 'retailPrice' instead of 'sellingPrice'
   const [formData, setFormData] = useState<Partial<InventoryItem>>({
     name: '',
     category: 'Medicine',
     sku: '',
-    stock: 0, // FIXED: was quantity
+    stock: 0,
     unit: 'vial',
-    purchasePrice: 0, // FIXED: was costPrice
-    retailPrice: 0, // FIXED: was sellingPrice
-    reorderLevel: 5, // FIXED: was minStockLevel
+    purchasePrice: 0,
+    retailPrice: 0,
+    reorderLevel: 5,
     expiryDate: '',
     supplier: '',
     location: '',
@@ -48,8 +50,8 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
         await onAddItem({
           ...formData,
           id: crypto.randomUUID(),
-          type: 'Product', // Default value
-          wholesalePrice: 0, // Default value
+          type: 'Product',
+          wholesalePrice: 0,
         } as InventoryItem);
       }
       setIsModalOpen(false);
@@ -71,7 +73,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
   };
 
   return (
-    <div className="space-y-6 animate-fade-in pb-20 md:pb-0">
+    <div className="space-y-6 animate-fade-in pb-24 md:pb-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Inventory Management</h2>
@@ -152,7 +154,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, currency, onAddItem, onUpd
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-700 font-medium">
-                      {item.retailPrice.toFixed(2)}
+                      {formatCurrency(item.retailPrice, currency)}
                     </td>
                     <td className="px-4 py-3">
                       {isExpired ? (

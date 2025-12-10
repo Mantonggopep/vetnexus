@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Pet, Owner, MedicalNote, Vitals, Reminder } from '../types';
-import { ArrowLeft, Activity, FileText, Plus, Sparkles, User, AlertTriangle, Info, Calendar, Clock, ChevronLeft, Heart, Thermometer, Weight, Bell, CheckCircle2 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { Pet, Owner, MedicalNote } from '../types';
+import { ChevronLeft, Activity, Plus, Sparkles, User, AlertTriangle, Info, Calendar, Clock, Heart, Thermometer, Weight, Bell, CheckCircle2 } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, Tooltip, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { generateSOAPNote } from '../services/geminiService';
 
 interface PatientDetailProps {
@@ -23,7 +23,6 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
     setAnimateIn(true);
   }, []);
 
-  // Handle Note Generation
   const handleGenerateNote = async () => {
     if (!noteInput.trim()) return;
     setIsGenerating(true);
@@ -52,7 +51,6 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
     setActiveTab('notes');
   };
 
-  // Custom Chart Tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -70,34 +68,19 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
   return (
     <>
       <style>{`
-        /* Reuse variables if already globally defined, or keep here for isolation */
-        :root {
-          --ios-primary: 0, 122, 255;
-          --ios-bg: 242, 242, 247;
-          --ios-card: 255, 255, 255;
-        }
-        .ios-glass-card {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.05);
-        }
+        :root { --ios-primary: 0, 122, 255; --ios-bg: 242, 242, 247; --ios-card: 255, 255, 255; }
+        .ios-glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.5); box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.05); }
         .slide-in-right { animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        @keyframes slideInRight {
-            from { opacity: 0; transform: translateX(20px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
         .scale-up { animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
-        @keyframes scaleUp {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
+        @keyframes scaleUp { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
       `}</style>
 
-      <div className={`flex flex-col h-[calc(100vh-6rem)] bg-[rgb(var(--ios-bg))] rounded-[32px] shadow-2xl overflow-hidden border border-white/40 ring-1 ring-black/5 font-sans transition-opacity duration-500 ${animateIn ? 'opacity-100' : 'opacity-0'}`}>
+      {/* Added max-h for mobile consistency */}
+      <div className={`flex flex-col h-full bg-[rgb(var(--ios-bg))] md:rounded-[32px] shadow-2xl overflow-hidden border border-white/40 ring-1 ring-black/5 font-sans transition-opacity duration-500 ${animateIn ? 'opacity-100' : 'opacity-0'}`}>
         
         {/* --- Top Navigation Bar --- */}
-        <div className="px-6 py-4 flex items-center bg-white/50 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-20">
+        <div className="px-4 md:px-6 py-3 md:py-4 flex items-center bg-white/50 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-20 shrink-0">
             <button 
                 onClick={onBack} 
                 className="group flex items-center text-[rgb(var(--ios-primary))] font-medium text-sm hover:opacity-70 transition-opacity"
@@ -110,17 +93,16 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
         </div>
 
         {/* --- Scrollable Content --- */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6 custom-scrollbar">
             
             {/* 1. Header Identity Card */}
-            <div className="ios-glass-card rounded-3xl p-6 relative overflow-hidden">
-                {/* Decorative background blob */}
+            <div className="ios-glass-card rounded-2xl md:rounded-3xl p-5 md:p-6 relative overflow-hidden">
                 <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl pointer-events-none"></div>
 
-                <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
+                <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start relative z-10">
                     {/* Image Area */}
-                    <div className="relative group">
-                        <div className="w-28 h-28 rounded-[2rem] overflow-hidden shadow-lg ring-4 ring-white">
+                    <div className="relative group shrink-0">
+                        <div className="w-24 h-24 md:w-28 md:h-28 rounded-[2rem] overflow-hidden shadow-lg ring-4 ring-white">
                             <img src={pet.imageUrl} alt={pet.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                         </div>
                         {pet.type === 'Herd' && (
@@ -131,11 +113,11 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                     </div>
                     
                     {/* Info Area */}
-                    <div className="flex-1 w-full">
-                        <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
+                    <div className="flex-1 w-full text-center md:text-left">
+                        <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-4">
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900 tracking-tight mb-1">{pet.name}</h1>
-                                <div className="flex items-center space-x-2 text-sm font-medium text-gray-500 mb-4">
+                                <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight mb-1">{pet.name}</h1>
+                                <div className="flex flex-wrap justify-center md:justify-start items-center gap-2 text-sm font-medium text-gray-500 mb-4">
                                     <span className="bg-gray-100 px-2 py-0.5 rounded-md text-gray-600">{pet.species}</span>
                                     <span>•</span>
                                     <span>{pet.breed}</span>
@@ -148,11 +130,11 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                             
                             {/* Owner Micro-Card */}
                             {owner && (
-                                <div className="bg-white/60 backdrop-blur-sm px-4 py-3 rounded-2xl border border-white shadow-sm flex items-center gap-3 min-w-[200px]">
+                                <div className="bg-white/60 backdrop-blur-sm px-4 py-3 rounded-2xl border border-white shadow-sm flex items-center gap-3 w-full md:w-auto justify-center md:justify-start">
                                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center text-white shadow-md">
                                         <User className="w-5 h-5" />
                                     </div>
-                                    <div>
+                                    <div className="text-left">
                                         <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Owner</p>
                                         <p className="text-sm font-bold text-gray-800">{owner.name}</p>
                                     </div>
@@ -161,7 +143,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                         </div>
 
                         {/* Tags */}
-                        <div className="flex flex-wrap gap-2 mt-2">
+                        <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
                             {pet.medicalConditions.map((cond, idx) => (
                                 <div key={idx} className="flex items-center bg-orange-50 text-orange-600 px-3 py-1.5 rounded-full text-xs font-bold border border-orange-100/50 shadow-sm">
                                     <Info className="w-3.5 h-3.5 mr-1.5" /> {cond}
@@ -177,9 +159,9 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                 </div>
             </div>
 
-            {/* 2. iOS Segmented Control Tabs */}
-            <div className="flex justify-center">
-                <div className="bg-gray-200/80 p-1 rounded-xl inline-flex relative shadow-inner">
+            {/* 2. iOS Segmented Control Tabs (Scrollable on Mobile) */}
+            <div className="flex justify-center w-full">
+                <div className="bg-gray-200/80 p-1 rounded-xl flex overflow-x-auto relative shadow-inner w-full md:w-auto no-scrollbar">
                     {['overview', 'notes', 'vitals', 'reminders'].map((tab) => {
                         const isActive = activeTab === tab;
                         return (
@@ -187,7 +169,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                                 key={tab}
                                 onClick={() => setActiveTab(tab as any)}
                                 className={`
-                                    relative px-8 py-2 text-xs font-bold rounded-lg capitalize transition-all duration-300 z-10
+                                    relative px-6 md:px-8 py-2 text-xs font-bold rounded-lg capitalize transition-all duration-300 z-10 whitespace-nowrap flex-1 md:flex-none
                                     ${isActive ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}
                                 `}
                             >
@@ -202,14 +184,14 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
             </div>
 
             {/* 3. Tab Content Area */}
-            <div className="slide-in-right">
+            <div className="slide-in-right pb-10">
                 
                 {/* --- OVERVIEW TAB --- */}
                 {activeTab === 'overview' && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                         {/* Vitals Summary */}
-                        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:scale-105 transition-transform duration-300">
+                        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
                                 <div className="w-10 h-10 rounded-full bg-blue-50 text-[rgb(var(--ios-primary))] flex items-center justify-center mb-2">
                                     <Weight className="w-5 h-5" />
                                 </div>
@@ -219,7 +201,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                                 </span>
                                 <span className="text-xs font-semibold text-gray-400 mt-1">Latest Weight</span>
                             </div>
-                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:scale-105 transition-transform duration-300">
+                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
                                 <div className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
                                     <Heart className="w-5 h-5" />
                                 </div>
@@ -230,7 +212,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                                 </span>
                                 <span className="text-xs font-semibold text-gray-400 mt-1">Heart Rate</span>
                             </div>
-                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:scale-105 transition-transform duration-300">
+                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
                                 <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mb-2">
                                     <Thermometer className="w-5 h-5" />
                                 </div>
@@ -280,13 +262,13 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                             </div>
                         ) : (
                             pet.notes.slice().reverse().map((note, idx) => (
-                                <div key={note.id} className="relative pl-6 animate-ios-slide-up" style={{animationDelay: `${idx * 100}ms`}}>
+                                <div key={note.id} className="relative pl-2 md:pl-6 animate-ios-slide-up" style={{animationDelay: `${idx * 100}ms`}}>
                                     {/* Timeline Dot */}
                                     <div className="absolute -left-[9px] top-6 w-4 h-4 rounded-full bg-white border-4 border-[rgb(var(--ios-primary))] shadow-sm z-10"></div>
                                     
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-300">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="flex items-center gap-3">
+                                    <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-300">
+                                        <div className="flex flex-col md:flex-row justify-between items-start mb-4 gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <div className={`
                                                     px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider
                                                     ${note.type === 'SOAP' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'}
@@ -314,16 +296,16 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                     </div>
                 )}
 
-                {/* --- REMINDERS TAB (NEW) --- */}
+                {/* --- REMINDERS TAB --- */}
                 {activeTab === 'reminders' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                         {pet.reminders && pet.reminders.length > 0 ? (
                             pet.reminders.map(rem => {
                                 const isOverdue = new Date(rem.dueDate) < new Date();
                                 return (
-                                    <div key={rem.id} className={`p-5 rounded-2xl border shadow-sm flex items-start justify-between ${isOverdue ? 'bg-red-50 border-red-100' : 'bg-white border-gray-100'}`}>
+                                    <div key={rem.id} className={`p-4 md:p-5 rounded-2xl border shadow-sm flex items-start justify-between ${isOverdue ? 'bg-red-50 border-red-100' : 'bg-white border-gray-100'}`}>
                                         <div className="flex items-start">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${isOverdue ? 'bg-red-100 text-red-500' : 'bg-green-50 text-green-500'}`}>
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 shrink-0 ${isOverdue ? 'bg-red-100 text-red-500' : 'bg-green-50 text-green-500'}`}>
                                                 <Bell className="w-5 h-5" />
                                             </div>
                                             <div>
@@ -336,15 +318,12 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                                                 <span className="inline-block mt-2 text-[10px] font-bold text-gray-400 bg-white border border-gray-200 px-2 py-1 rounded-md uppercase">{rem.type}</span>
                                             </div>
                                         </div>
-                                        <button className="text-gray-300 hover:text-green-500 transition-colors">
-                                            <CheckCircle2 className="w-6 h-6" />
-                                        </button>
                                     </div>
                                 )
                             })
                         ) : (
                             <div className="col-span-2 text-center py-12 text-gray-400 italic bg-white rounded-2xl border border-dashed border-gray-300">
-                                No active reminders found for this patient.
+                                No active reminders.
                             </div>
                         )}
                     </div>
@@ -352,12 +331,12 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
 
                 {/* --- VITALS CHART TAB --- */}
                 {activeTab === 'vitals' && (
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 h-[400px]">
+                    <div className="bg-white p-4 md:p-6 rounded-3xl shadow-sm border border-gray-100 h-[350px] md:h-[400px]">
                         <h3 className="font-bold text-gray-800 mb-6 flex items-center">
                             <Activity className="w-5 h-5 mr-2 text-[rgb(var(--ios-primary))]" />
                             Weight Progression
                         </h3>
-                        <div className="w-full h-[300px]">
+                        <div className="w-full h-[250px] md:h-[300px]">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={pet.vitalsHistory}>
                                     <defs>
@@ -399,26 +378,21 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
             </div>
         </div>
 
-        {/* --- ADD NOTE MODAL (Glass Sheet) --- */}
+        {/* --- ADD NOTE MODAL --- */}
         {isNoteModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                 <div className="absolute inset-0 bg-gray-900/30 backdrop-blur-sm transition-opacity" onClick={() => setIsNoteModalOpen(false)} />
-                
                 <div className="relative bg-white/90 backdrop-blur-xl rounded-[32px] shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col scale-up border border-white/50">
-                    {/* Header */}
                     <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0">
                         <div>
                             <h3 className="font-bold text-xl text-gray-900 flex items-center">
                                 <Sparkles className="w-5 h-5 mr-2 text-[rgb(var(--ios-primary))]" />
                                 AI Clinical Assistant
                             </h3>
-                            <p className="text-xs text-gray-500 mt-1">Dictate raw notes, we'll format them.</p>
                         </div>
                         <button onClick={() => setIsNoteModalOpen(false)} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 font-bold transition-colors">✕</button>
                     </div>
-                    
-                    {/* Body */}
-                    <div className="p-8 overflow-y-auto custom-scrollbar space-y-6">
+                    <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar space-y-6">
                         <div>
                             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Observations</label>
                             <textarea
@@ -428,7 +402,6 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                                 onChange={(e) => setNoteInput(e.target.value)}
                             />
                         </div>
-
                         <div className="flex justify-end">
                             <button 
                                 onClick={handleGenerateNote} 
@@ -442,7 +415,6 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                                 )}
                             </button>
                         </div>
-
                         {generatedNote && (
                             <div className="animate-ios-slide-up">
                                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Formatted Result</label>
@@ -454,17 +426,9 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ pet, owner, onBack, onAdd
                             </div>
                         )}
                     </div>
-
-                    {/* Footer */}
                     <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/50 rounded-b-[32px]">
                         <button onClick={() => setIsNoteModalOpen(false)} className="px-6 py-3 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-100 transition-colors">Cancel</button>
-                        <button 
-                            onClick={handleSaveNote}
-                            disabled={!noteInput && !generatedNote} 
-                            className="px-8 py-3 bg-[rgb(var(--ios-primary))] hover:brightness-110 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/30 transition-all active:scale-95"
-                        >
-                            Save Record
-                        </button>
+                        <button onClick={handleSaveNote} disabled={!noteInput && !generatedNote} className="px-8 py-3 bg-[rgb(var(--ios-primary))] hover:brightness-110 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/30 transition-all active:scale-95">Save Record</button>
                     </div>
                 </div>
             </div>

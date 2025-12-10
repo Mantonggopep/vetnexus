@@ -419,7 +419,6 @@ const App: React.FC = () => {
                     {currentView === 'patients' && selectedPatientId && (
                             <PatientDetail pet={appState.pets.find(p => p.id === selectedPatientId)!} onBack={() => setSelectedPatientId(null)} onAddNote={handleAddNote} />
                     )}
-                    {/* FIXED: Clients component now processes its own data */}
                     {currentView === 'clients' && <Clients currency={currency} />}
                     {currentView === 'appointments' && <Appointments appointments={appState.appointments} pets={appState.pets} owners={appState.owners} onAddAppointment={handleAddAppointment} />}
                     {currentView === 'treatments' && <Treatments activePatients={appState.pets} appointments={appState.appointments} consultations={appState.consultations} owners={appState.owners} settings={currentTenant.settings} plan={currentTenant.plan} onSelectPatient={handlePatientSelect} onAddConsultation={handleAddConsultation} onAddLabRequest={handleAddLabRequest} onAddPatient={handleAddPatient} />}

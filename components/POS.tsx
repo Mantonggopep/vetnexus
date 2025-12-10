@@ -90,7 +90,8 @@ const POS: React.FC<POSProps> = ({ sales = [], owners = [], settings, inventory 
       });
       setSearchTerm('');
       setIsSearchFocused(false);
-      // On mobile, switch to cart immediately to show feedback? Optional. Let's stay on shop for speed.
+      // Optional: Auto-switch to cart on mobile?
+      // setMobileTab('Cart'); 
   };
 
   const updateQty = (id: string, newQty: number) => {
@@ -158,7 +159,6 @@ const POS: React.FC<POSProps> = ({ sales = [], owners = [], settings, inventory 
   // --- PRINT FUNCTION ---
   const handlePrint = () => {
       if (!printData) return;
-      // ... (Print logic same as previous, abbreviated for length. The print modal handles the call)
       const isPaid = printData.status === 'Paid';
       const color = isPaid ? '#10b981' : '#f59e0b';
       const clinicName = settings.name || settings.clinicName || "Veterinary Clinic";
@@ -171,29 +171,30 @@ const POS: React.FC<POSProps> = ({ sales = [], owners = [], settings, inventory 
       if (win) { win.document.write(printContent); win.document.close(); }
   };
 
-  // --- RESPONSIVE LAYOUT HELPERS ---
-  const isMobile = true; // We use CSS classes to handle responsiveness mostly, but this logic helps for tab switching
-
+  // Height Calculation: 100vh - (Header 64px + MobileNav 64px + Padding)
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-6rem)] md:gap-6 p-2 md:p-4 font-sans bg-slate-50/50">
+    <div className="flex flex-col md:flex-row md:h-[calc(100vh-6rem)] h-[calc(100dvh-9rem)] md:gap-6 font-sans bg-transparent">
         
-        {/* MOBILE TABS (Top Navigation for small screens) */}
-        <div className="md:hidden flex bg-white p-1 rounded-xl shadow-sm mb-2 shrink-0">
-            <button onClick={() => setMobileTab('Shop')} className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 ${mobileTab === 'Shop' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>
-                <Store className="w-4 h-4" /> Shop
-            </button>
-            <button onClick={() => setMobileTab('Cart')} className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 ${mobileTab === 'Cart' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>
-                <ShoppingCart className="w-4 h-4" /> Cart ({cart.length})
-            </button>
-            <button onClick={() => setMobileTab('History')} className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 ${mobileTab === 'History' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>
-                <History className="w-4 h-4" /> Recent
-            </button>
+        {/* MOBILE TABS */}
+        <div className="md:hidden grid grid-cols-3 gap-2 bg-white p-1 rounded-xl shadow-sm mb-2 shrink-0">
+            {['Shop', 'Cart', 'History'].map((tab) => (
+                <button 
+                    key={tab}
+                    onClick={() => setMobileTab(tab as any)} 
+                    className={`py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${mobileTab === tab ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    {tab === 'Shop' && <Store className="w-4 h-4" />}
+                    {tab === 'Cart' && <ShoppingCart className="w-4 h-4" />}
+                    {tab === 'History' && <History className="w-4 h-4" />}
+                    {tab} {tab === 'Cart' && cart.length > 0 && <span className="bg-emerald-500 text-white text-[10px] px-1.5 rounded-full">{cart.length}</span>}
+                </button>
+            ))}
         </div>
 
-        {/* --- LEFT PANEL: SEARCH & HISTORY (Hidden on mobile unless correct tab) --- */}
+        {/* --- LEFT PANEL: SEARCH & HISTORY --- */}
         <div className={`flex-1 flex-col gap-4 md:gap-6 h-full relative ${mobileTab === 'Cart' ? 'hidden md:flex' : 'flex'} ${mobileTab === 'History' ? 'hidden md:flex' : ''}`}>
             
-            {/* SEARCH AREA (Shop Tab) */}
+            {/* SEARCH AREA */}
             <div className={`flex flex-col gap-4 z-40 ${mobileTab === 'History' ? 'hidden md:flex' : ''}`}>
                 <div className="relative w-full" ref={searchRef}>
                     <div className="relative group">
@@ -207,12 +208,9 @@ const POS: React.FC<POSProps> = ({ sales = [], owners = [], settings, inventory 
                             className="w-full pl-11 pr-4 py-3 md:py-4 bg-white border border-slate-200 rounded-2xl text-base font-medium focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none shadow-sm transition-all"
                         />
                     </div>
-                    {/* RESULTS DROPDOWN (Or list on mobile) */}
+                    {/* RESULTS */}
                     {(isSearchFocused || mobileTab === 'Shop') && (
-                        <div className={`${isSearchFocused ? 'absolute top-full left-0 right-0 mt-2 shadow-2xl border-slate-100 z-50 max-h-96' : 'static mt-4 shadow-none border-transparent h-full'} bg-white rounded-2xl border overflow-hidden flex flex-col`}>
-                             <div className="p-2 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 shrink-0">
-                                {searchTerm ? 'Search Results' : 'Inventory Items'}
-                            </div>
+                        <div className={`${isSearchFocused ? 'absolute top-full left-0 right-0 mt-2 shadow-2xl border-slate-100 z-50 max-h-96' : 'static mt-4 shadow-none border-transparent h-full'} bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col`}>
                             <div className="overflow-y-auto custom-scrollbar flex-1">
                                 {searchResults.length > 0 ? (
                                     searchResults.map(item => (
@@ -245,7 +243,7 @@ const POS: React.FC<POSProps> = ({ sales = [], owners = [], settings, inventory 
                 </div>
             </div>
 
-            {/* HISTORY LIST (Desktop always visible bottom left, Mobile 'History' Tab) */}
+            {/* HISTORY LIST */}
             <div className={`flex-1 bg-white/60 backdrop-blur-xl rounded-[2.5rem] border border-white/60 shadow-xl shadow-slate-200/50 overflow-hidden relative flex flex-col ${mobileTab === 'Shop' ? 'hidden md:flex' : ''}`}>
                  <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
                     <h3 className="font-bold text-slate-700">Recent Transactions</h3>
@@ -286,7 +284,7 @@ const POS: React.FC<POSProps> = ({ sales = [], owners = [], settings, inventory 
             </div>
         </div>
 
-        {/* --- RIGHT PANEL: TRANSACTION CART (Mobile 'Cart' Tab) --- */}
+        {/* --- RIGHT PANEL: TRANSACTION CART --- */}
         <div className={`w-full md:w-[420px] flex flex-col h-full bg-white md:rounded-[2.5rem] rounded-xl shadow-none md:shadow-2xl md:border border-slate-200 overflow-hidden z-30 ${mobileTab === 'Cart' ? 'flex' : 'hidden md:flex'}`}>
             
             {/* Cart Header */}
@@ -336,7 +334,7 @@ const POS: React.FC<POSProps> = ({ sales = [], owners = [], settings, inventory 
             </div>
 
             {/* Cart Footer */}
-            <div className="bg-slate-50 p-4 md:p-5 border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20 pb-20 md:pb-5">
+            <div className="bg-slate-50 p-4 md:p-5 border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20 pb-2 md:pb-5">
                  <div className="space-y-1 mb-4">
                      <div className="flex justify-between items-end pt-2 border-t border-slate-200 mt-2">
                          <span className="text-sm font-bold text-slate-800">Total Due</span>
@@ -368,7 +366,7 @@ const POS: React.FC<POSProps> = ({ sales = [], owners = [], settings, inventory 
             </div>
         </div>
 
-        {/* --- PRINT MODAL (Same as before) --- */}
+        {/* --- PRINT MODAL --- */}
         {showPrintModal && printData && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
                 <div className="bg-white rounded-2xl w-full max-w-lg p-6 text-center">

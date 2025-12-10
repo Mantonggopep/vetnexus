@@ -9,7 +9,7 @@ interface AuthProps {
   plans: Plan[];
 }
 
-export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
+export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = [] }) => {
   const navigate = useNavigate();
   
   // --- STATE ---
@@ -25,7 +25,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
   // Signup State
   const [name, setName] = useState('');
   const [clinicName, setClinicName] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState('Professional'); // Default plan
+  const [selectedPlan, setSelectedPlan] = useState('Professional'); 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +33,6 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
     
     // --- HANDLE CLIENT REDIRECT ---
     if (userType === 'CLIENT') {
-      // Redirect to the dedicated Client Portal Login page
-      // Make sure you have a route for this in App.tsx!
       navigate('/portal/login');
       return;
     }
@@ -45,13 +43,15 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
       if (isLogin) {
         await onLogin(email, password);
       } else {
+        // Find selected plan or default to first available
         const planDetails = plans.find(p => p.name === selectedPlan) || plans[0];
+        const planName = planDetails?.name || 'Trial';
         
-        // Construct the Tenant Object
+        // Construct the Tenant Object (Clinic)
         const newTenant: Tenant = {
             id: '', 
             name: clinicName, 
-            plan: (planDetails?.name as any) || 'Trial', 
+            plan: planName as any, 
             billingPeriod: 'Monthly', 
             settings: {
                 name: clinicName,
@@ -72,19 +72,21 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
             storageUsed: 0 
         };
 
+        // Construct the User Object (Admin)
         const newUser: UserProfile = { 
             id: '', 
             tenantId: '', 
             name, 
             email, 
-            roles: ['SuperAdmin'] // First user is always SuperAdmin
+            roles: ['SuperAdmin'] 
         };
 
         await onSignup(newUser, newTenant, password);
       }
     } catch (err: any) {
       console.error("Auth Error:", err);
-      setError(err.message || "Authentication failed. Please check your credentials.");
+      // Display a friendly error message
+      setError(err.message || err.response?.data?.error || "Authentication failed. Please check your credentials.");
     } finally {
       setLoading(false);
     }
@@ -110,7 +112,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
           </p>
         </div>
         
-        {/* Decorative Circles */}
+        {/* Decorative Background Elements */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-indigo-500 rounded-full opacity-50 blur-3xl"></div>
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-indigo-700 rounded-full opacity-50 blur-3xl"></div>
         
@@ -123,7 +125,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
       <div className="flex-1 flex items-center justify-center p-4 md:p-12">
         <div className="w-full max-w-md space-y-8">
           
-          {/* Mobile Header */}
+          {/* Mobile Header (Visible only on small screens) */}
           <div className="md:hidden text-center mb-8">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-600 text-white mb-4 shadow-lg">
               <Stethoscope className="w-6 h-6" />
@@ -131,7 +133,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
             <h1 className="text-2xl font-bold text-gray-900">VetNexus</h1>
           </div>
 
-          {/* User Type Toggle */}
+          {/* User Type Toggle (Staff vs Client) */}
           <div className="bg-white p-1 rounded-xl border border-gray-200 shadow-sm flex mb-6">
             <button
                 type="button"
@@ -159,11 +161,11 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
             </button>
           </div>
 
-          {/* Form Container */}
+          {/* Main Form Card */}
           <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
             
             {userType === 'CLIENT' ? (
-                // --- CLIENT VIEW ---
+                // --- CLIENT PORTAL VIEW ---
                 <div className="text-center space-y-6">
                     <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-500 mb-4 animate-bounce-slow">
                         <PawPrint className="w-8 h-8" />
@@ -185,7 +187,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
                     </div>
                 </div>
             ) : (
-                // --- STAFF VIEW ---
+                // --- STAFF LOGIN/SIGNUP VIEW ---
                 <>
                     <div className="mb-6">
                         <h2 className="text-2xl font-bold text-gray-900">
@@ -196,11 +198,11 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
                         </p>
                     </div>
 
-                    {/* Error Message */}
+                    {/* Error Display */}
                     {error && (
-                        <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2 text-sm text-red-600">
+                        <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2 text-sm text-red-600 animate-pulse">
                             <AlertCircle className="w-5 h-5 shrink-0" />
-                            <span>{error}</span>
+                            <span className="break-words">{error}</span>
                         </div>
                     )}
 
@@ -209,22 +211,27 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
                             <>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                                    <input required type="text" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Dr. John Doe" value={name} onChange={e => setName(e.target.value)} />
+                                    <input required type="text" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="Dr. John Doe" value={name} onChange={e => setName(e.target.value)} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Clinic Name</label>
-                                    <input required type="text" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Happy Pets Clinic" value={clinicName} onChange={e => setClinicName(e.target.value)} />
+                                    <input required type="text" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="Happy Pets Clinic" value={clinicName} onChange={e => setClinicName(e.target.value)} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Select Plan</label>
                                     <select 
-                                        className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                        className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none bg-white transition-all"
                                         value={selectedPlan}
                                         onChange={e => setSelectedPlan(e.target.value)}
+                                        disabled={plans.length === 0}
                                     >
-                                        {plans.map(plan => (
-                                            <option key={plan.id} value={plan.name}>{plan.name}</option>
-                                        ))}
+                                        {plans.length > 0 ? (
+                                            plans.map(plan => (
+                                                <option key={plan.id} value={plan.name}>{plan.name}</option>
+                                            ))
+                                        ) : (
+                                            <option value="Professional">Professional (Default)</option>
+                                        )}
                                     </select>
                                 </div>
                             </>
@@ -232,12 +239,12 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
                         
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                            <input required type="email" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="doctor@clinic.com" value={email} onChange={e => setEmail(e.target.value)} />
+                            <input required type="email" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="doctor@clinic.com" value={email} onChange={e => setEmail(e.target.value)} />
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                            <input required type="password" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+                            <input required type="password" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
                         </div>
 
                         <button 
@@ -253,7 +260,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
                         <button 
                             type="button"
                             onClick={() => { setIsLogin(!isLogin); setError(null); }}
-                            className="text-sm text-indigo-600 font-medium hover:text-indigo-800"
+                            className="text-sm text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
                         >
                             {isLogin ? "New clinic? Create an account" : "Already have an account? Sign in"}
                         </button>

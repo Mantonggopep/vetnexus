@@ -1,66 +1,81 @@
-import { FastifyInstance } from 'fastify';
-import { prisma } from '../lib/prisma';
-import { authenticate, AuthenticatedRequest } from '../middleware/auth';
-import { createLog, checkLimits } from '../utils/serverHelpers';
-import bcrypt from 'bcryptjs';
+import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
+import cookie from '@fastify/cookie';
+import cors from '@fastify/cors';
+import dotenv from 'dotenv';
 
-export async function userRoutes(app: FastifyInstance) {
+// Import local utilities (Fixed paths from '../' to './')
+import { prisma } from './lib/prisma'; 
+
+// Import Routes
+// Ensure these files exist in your src/routes/ folder
+import { authRoutes } from './routes/auth.routes';
+import { userRoutes } from './routes/user.routes'; // This is where the code you posted earlier should go
+import { clientPortalRoutes } from './routes/client.portal.routes';
+
+// Load environment variables
+dotenv.config();
+
+const app = Fastify({
+  logger: true,
+});
+
+async function main() {
+  try {
+    // --- 1. Register Global Plugins ---
+
+    // Fixes "Property 'setCookie' does not exist"
+    await app.register(cookie, {
+      secret: process.env.COOKIE_SECRET || 'super-secret-development-key', 
+      hook: 'onRequest', 
+      parseOptions: {} 
+    });
+
+    // Enables Cross-Origin Resource Sharing
+    await app.register(cors, {
+      origin: true, // Allow all origins (configure this for production!)
+      credentials: true, // Allow cookies to be sent
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    });
+
+    // --- 2. Health Check / DB Check ---
+    app.get('/health', async (req, reply) => {
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+        return { status: 'ok', db: 'connected' };
+      } catch (error) {
+        app.log.error(error);
+        return reply.status(500).send({ status: 'error', db: 'disconnected' });
+      }
+    });
+
+    // --- 3. Register Routes ---
     
-    // GET ALL USERS
-    app.get('/', { preHandler: [authenticate] }, async (req, reply) => {
-        const user = (req as AuthenticatedRequest).user!;
-        
-        const users = await prisma.user.findMany({
-            where: { tenantId: user.tenantId },
-            select: { id: true, name: true, email: true, role: true, createdAt: true }
-        });
-        return reply.send(users);
-    });
+    // Auth Routes (Login, Signup, Logout)
+    await app.register(authRoutes, { prefix: '/api/auth' });
+    
+    // User Routes (The code you posted earlier belongs in src/routes/user.routes.ts)
+    await app.register(userRoutes, { prefix: '/api/users' });
+    
+    // Client Portal Routes
+    await app.register(clientPortalRoutes, { prefix: '/api/portal' });
 
-    // CREATE USER (Staff)
-    app.post('/', { preHandler: [authenticate] }, async (req, reply) => {
-        const user = (req as AuthenticatedRequest).user!;
-        const body = req.body as any;
+    // --- 4. Start Server ---
+    const PORT = Number(process.env.PORT) || 3000;
+    
+    await app.listen({ port: PORT, host: '0.0.0.0' });
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
 
-        if (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
-            return reply.status(403).send({ error: "Only Admins can create users" });
-        }
-
-        try {
-            await checkLimits(user.tenantId, 'users', 1);
-
-            const hashedPassword = await bcrypt.hash(body.password || 'welcome123', 10);
-
-            const newUser = await prisma.user.create({
-                data: {
-                    tenantId: user.tenantId,
-                    name: body.name,
-                    email: body.email,
-                    passwordHash: hashedPassword,
-                    role: body.role || 'VET'
-                }
-            });
-
-            await createLog(user.tenantId, user.name, 'Created Staff User', 'admin', newUser.name);
-            
-            const { passwordHash, ...safeUser } = newUser;
-            return reply.send(safeUser);
-        } catch (e: any) {
-            return reply.status(403).send({ error: e.message });
-        }
-    });
-
-    // DELETE USER
-    app.delete('/:id', { preHandler: [authenticate] }, async (req, reply) => {
-        const user = (req as AuthenticatedRequest).user!;
-        const { id } = req.params as any;
-
-        if (user.role !== 'ADMIN') return reply.status(403).send({ error: "Unauthorized" });
-        if (id === user.id) return reply.status(400).send({ error: "Cannot delete yourself" });
-
-        await prisma.user.delete({ where: { id, tenantId: user.tenantId } });
-        await createLog(user.tenantId, user.name, 'Deleted User', 'admin');
-        
-        return reply.send({ success: true });
-    });
+  } catch (err) {
+    app.log.error(err);
+    process.exit(1);
+  }
 }
+
+// Handle graceful shutdown
+process.on('SIGINT', async () => {
+  await app.close();
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+main();

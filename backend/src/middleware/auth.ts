@@ -1,15 +1,14 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-
 import { prisma } from '../lib/prisma';
 
-// --- UPDATED INTERFACE: Includes 'name' ---
+// --- UPDATED INTERFACE ---
 export interface AuthUser {
   id: string;
   tenantId: string;
   roles: string[];
-  name: string; // <--- This is the critical fix
+  name: string;
+  type: 'STAFF' | 'CLIENT'; // <--- Added to distinguish context
 }
 
 export type AuthenticatedRequest = FastifyRequest & {
@@ -20,6 +19,7 @@ interface JwtPayload {
   userId: string;
   tenantId: string;
   name?: string;
+  type?: 'STAFF' | 'CLIENT'; // <--- Added to JWT payload
   iat: number;
   exp: number;
 }
@@ -39,38 +39,62 @@ export const authenticate = async (request: FastifyRequest, reply: FastifyReply)
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET) as JwtPayload;
     
-    // We try to get the name from the token first (fastest)
-    // If not in token, we fetch from DB (slower but safer)
-    let userName = decoded.name;
-    let roles: string[] = [];
+    // Default to STAFF for backward compatibility with existing tokens
+    const userType = decoded.type || 'STAFF'; 
 
-    // Always verify user exists in DB to prevent banned users from acting
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { id: true, tenantId: true, roles: true, isSuspended: true, name: true }
-    });
+    if (userType === 'CLIENT') {
+        // --- CLIENT (OWNER) AUTHENTICATION ---
+        const owner = await prisma.owner.findUnique({
+            where: { id: decoded.userId },
+            select: { id: true, tenantId: true, name: true, isPortalActive: true }
+        });
 
-    if (!user) {
-      return reply.status(401).send({ error: 'User not found' });
+        if (!owner) {
+            return reply.status(401).send({ error: 'Client account not found' });
+        }
+
+        if (!owner.isPortalActive) {
+            return reply.status(403).send({ error: 'Client portal access is not active' });
+        }
+
+        (request as AuthenticatedRequest).user = {
+            id: owner.id,
+            tenantId: owner.tenantId,
+            roles: ['CLIENT'], // Virtual role for clients
+            name: owner.name,
+            type: 'CLIENT'
+        };
+
+    } else {
+        // --- STAFF (USER) AUTHENTICATION ---
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.userId },
+            select: { id: true, tenantId: true, roles: true, isSuspended: true, name: true }
+        });
+
+        if (!user) {
+            return reply.status(401).send({ error: 'User not found' });
+        }
+
+        if (user.isSuspended) {
+            return reply.status(403).send({ error: 'Account suspended' });
+        }
+
+        let roles: string[] = [];
+        try {
+            roles = JSON.parse(user.roles as string);
+        } catch (e) {
+            roles = [user.roles as string];
+        }
+
+        (request as AuthenticatedRequest).user = {
+            id: user.id,
+            tenantId: user.tenantId,
+            roles: roles,
+            name: user.name,
+            type: 'STAFF'
+        };
     }
-
-    if (user.isSuspended) {
-      return reply.status(403).send({ error: 'Account suspended' });
-    }
-
-    try {
-        roles = JSON.parse(user.roles as string);
-    } catch (e) {
-        roles = [user.roles as string];
-    }
-
-    // Attach user to request
-    (request as AuthenticatedRequest).user = {
-      id: user.id,
-      tenantId: user.tenantId,
-      roles: roles,
-      name: user.name // Ensure this comes from DB if not in token
-    };
 
   } catch (err) {
     return reply.status(401).send({ error: 'Invalid or expired token' });

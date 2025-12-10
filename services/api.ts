@@ -1,9 +1,6 @@
 import axios from 'axios';
 
 // --- CONFIGURATION ---
-// FIX: We now point directly to the Render backend.
-// This prevents the "405 Method Not Allowed" error caused by Vercel
-// trying to handle the '/api' route locally instead of proxying it.
 const PRODUCTION_API_URL = 'https://vetnexus-backend.onrender.com/api';
 const LOCAL_API_URL = 'http://localhost:4000/api';
 
@@ -15,21 +12,18 @@ console.log("API Configured to:", baseURL);
 
 const api = axios.create({
   baseURL,
-  withCredentials: true, // Crucial for cookies/sessions across domains
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   }
 });
 
-// Response Interceptor to handle errors and log them for debugging
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Log the actual URL that failed to help debugging
     if (error.config) {
         console.error(`API Request failed on: ${error.config.url}`);
     }
-    
     const message = error.response?.data?.error || error.message || 'An unexpected error occurred';
     return Promise.reject({ ...error, message });
   }
@@ -68,6 +62,8 @@ export const PatientService = {
 export const OwnerService = {
   getAll: () => api.get('/owners'),
   create: (data: any) => api.post('/owners', data),
+  // NEW: Update Portal Access (Set Password)
+  updatePortalAccess: (id: string, data: { password?: string, isActive: boolean }) => api.patch(`/owners/${id}/portal`, data),
 };
 
 export const InventoryService = {
@@ -120,7 +116,6 @@ export const SuperAdminService = {
   getStats: () => api.get('/admin/stats'),
 };
 
-// --- NEW CLIENT PORTAL SERVICE ---
 export const ClientPortalService = {
   login: (credentials: any) => api.post('/portal/login', credentials),
   getDashboard: () => api.get('/portal/dashboard'),

@@ -1,206 +1,213 @@
-import { FastifyInstance } from 'fastify';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { prisma } from '../lib/prisma';
-import { createLog, verifyPayment } from '../utils/serverHelpers';
-import { sendEmail } from '../utils/email';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plan, UserProfile, Tenant } from '../types';
+import { Loader2, Stethoscope, PawPrint, ArrowRight, ShieldCheck, User } from 'lucide-react';
 
-const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
-
-export async function authRoutes(app: FastifyInstance) {
-    
-    // --- AUTH ME (Session Check) ---
-    app.get('/auth/me', async (req, reply) => {
-        const token = req.cookies.token;
-        if (!token) return reply.send({ user: null, tenant: null });
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-            const user = await prisma.user.findUnique({ where: { id: decoded.userId }, include: { tenant: true } });
-            if (!user) return reply.send({ user: null, tenant: null });
-            
-            let roles = []; try { roles = JSON.parse(user.roles); } catch(e) { roles = [user.roles]; }
-            let settings = {}; try { settings = JSON.parse(user.tenant.settings); } catch(e) {}
-            
-            return reply.send({
-                user: { id: user.id, name: user.name, email: user.email, roles, tenantId: user.tenantId, avatarUrl: user.avatarUrl },
-                tenant: { ...user.tenant, settings }
-            });
-        } catch (err) { return reply.send({ user: null, tenant: null }); }
-    });
-
-    // --- LOGIN ---
-    app.post('/auth/login', async (req, reply) => {
-        const { email, password } = req.body as any;
-        const user = await prisma.user.findFirst({ where: { email }, include: { tenant: true } });
-        
-        if (!user || !await bcrypt.compare(password, user.passwordHash)) {
-            return reply.status(401).send({ error: 'Invalid credentials' });
-        }
-        if (user.isSuspended) return reply.status(403).send({ error: 'Account suspended' });
-
-        await createLog(user.tenantId, user.name, 'User Login', 'system');
-        
-        // Generate Token
-        const token = jwt.sign({ userId: user.id, tenantId: user.tenantId, name: user.name }, process.env.JWT_SECRET!, { expiresIn: '8h' });
-        
-        // FIX: Cookie Settings for Cross-Origin (Vercel -> Render)
-        reply.setCookie('token', token, { 
-            path: '/', 
-            httpOnly: true, 
-            secure: true,       // Required for sameSite: 'none'
-            sameSite: 'none',   // Required for Cross-Site requests
-            maxAge: 28800       // 8 hours
-        });
-
-        let roles = []; try { roles = JSON.parse(user.roles); } catch(e) { roles = [user.roles]; }
-        let settings = {}; try { settings = JSON.parse(user.tenant.settings); } catch(e) {}
-        
-        return reply.send({ 
-            user: { id: user.id, name: user.name, email: user.email, roles, tenantId: user.tenantId, avatarUrl: user.avatarUrl },
-            tenant: { ...user.tenant, settings }
-        });
-    });
-
-    // --- SIGNUP FLOW 1: Initiate (Send OTP) ---
-    app.post('/auth/signup/initiate', async (req, reply) => {
-        const { email } = req.body as any;
-        if (!email) return reply.status(400).send({ error: 'Email is required' });
-
-        const existingUser = await prisma.user.findFirst({ where: { email } });
-        if (existingUser) return reply.status(400).send({ error: 'This email is already registered.' });
-
-        const otp = generateOTP();
-        const expires = new Date(Date.now() + 15 * 60 * 1000); 
-
-        await prisma.verificationToken.upsert({
-            where: { identifier_type: { identifier: email, type: 'EMAIL_VERIFICATION' } },
-            update: { token: otp, expires },
-            create: { identifier: email, token: otp, expires, type: 'EMAIL_VERIFICATION' },
-        });
-
-        const sent = await sendEmail(email, 'Verify your email - Vet Nexus Pro', 
-            `<h2>Welcome to Vet Nexus Pro</h2><p>Your verification code is: <b>${otp}</b></p>`
-        );
-
-        if (!sent) return reply.status(500).send({ error: 'Failed to send email' });
-        return reply.send({ message: 'Verification code sent.' });
-    });
-
-    // --- SIGNUP FLOW 2: Verify OTP ---
-    app.post('/auth/signup/verify', async (req, reply) => {
-        const { email, code } = req.body as any;
-        const record = await prisma.verificationToken.findUnique({
-            where: { identifier_type: { identifier: email, type: 'EMAIL_VERIFICATION' } },
-        });
-        if (!record || record.token !== code || record.expires < new Date()) {
-            return reply.status(400).send({ error: 'Invalid or expired code.' });
-        }
-        return reply.send({ message: 'Email verified.' });
-    });
-
-    // --- SIGNUP FLOW 3: Complete Registration ---
-    app.post('/auth/signup', async (req, reply) => {
-        try {
-            const { name, email, password, clinicName, plan, country, paymentRef, billingPeriod, verificationCode } = req.body as any;
-            
-            // Payment Verification
-            if (paymentRef && paymentRef !== 'TRIAL' && !await verifyPayment(paymentRef)) {
-                return reply.status(402).send({ error: 'Payment verification failed' });
-            }
-
-            // OTP Verification (Double check)
-            const tokenRecord = await prisma.verificationToken.findUnique({
-                where: { identifier_type: { identifier: email, type: 'EMAIL_VERIFICATION' } },
-            });
-            
-            // Allow if code matches OR if paymentRef implies a direct signup bypass (if applicable, otherwise keep strict)
-            if (!tokenRecord || tokenRecord.token !== verificationCode) {
-                return reply.status(400).send({ error: 'Email verification required.' });
-            }
-
-            const settings = JSON.stringify({ name: clinicName, currency: country === 'Nigeria' ? 'NGN' : 'USD', taxRate: 7.5, paymentRef: paymentRef || 'TRIAL' });
-            
-            const result = await prisma.$transaction(async (tx) => {
-                // 1. Double check user existence inside transaction
-                if (await tx.user.findFirst({ where: { email } })) throw new Error("Email registered");
-                
-                // 2. Create Tenant (Clinic)
-                const tenant = await tx.tenant.create({ 
-                    data: { name: clinicName, plan: plan || 'Trial', billingPeriod: billingPeriod || 'Monthly', settings, storageUsed: 0 } 
-                });
-                
-                // 3. Create User (Admin)
-                const passwordHash = await bcrypt.hash(password, 10);
-                const user = await tx.user.create({ 
-                    data: { 
-                        tenantId: tenant.id, 
-                        name, 
-                        email, 
-                        passwordHash, 
-                        // ✅ FIX: Ensure they are 'Admin' (Clinic Owner), NOT 'SuperAdmin'
-                        roles: JSON.stringify(['Admin']), 
-                        isVerified: true 
-                    } 
-                });
-                
-                // 4. Cleanup
-                await tx.log.create({ data: { tenantId: tenant.id, user: 'System', action: 'Clinic Created', type: 'system' } });
-                await tx.verificationToken.delete({ where: { identifier_type: { identifier: email, type: 'EMAIL_VERIFICATION' } } });
-
-                return { tenant, user };
-            });
-
-            const token = jwt.sign({ userId: result.user.id, tenantId: result.tenant.id, name: result.user.name }, process.env.JWT_SECRET!, { expiresIn: '8h' });
-            
-            // Fix: Set Cookie for correct session handling
-            reply.setCookie('token', token, { 
-                path: '/', 
-                httpOnly: true, 
-                secure: true, 
-                sameSite: 'none', 
-                maxAge: 28800 
-            });
-
-            return reply.send({ message: 'Success', tenantId: result.tenant.id });
-        } catch (error: any) { 
-            return reply.status(500).send({ error: error.message }); 
-        }
-    });
-
-    // --- LOGOUT ---
-    app.post('/auth/logout', async (req, reply) => {
-        // Clear cookie with same options (secure, sameSite) to ensure it's actually removed
-        reply.clearCookie('token', { path: '/', secure: true, sameSite: 'none', httpOnly: true });
-        return reply.send({ message: 'Logged out' });
-    });
-    
-    // --- PASSWORD RESET ---
-    app.post('/auth/password/forgot', async (req, reply) => {
-        const { email } = req.body as any;
-        const user = await prisma.user.findFirst({ where: { email } });
-        if (!user) return reply.send({ message: 'Reset code sent.' });
-
-        const otp = generateOTP();
-        await prisma.verificationToken.upsert({
-            where: { identifier_type: { identifier: email, type: 'PASSWORD_RESET' } },
-            update: { token: otp, expires: new Date(Date.now() + 15 * 60 * 1000) },
-            create: { identifier: email, token: otp, expires: new Date(Date.now() + 15 * 60 * 1000), type: 'PASSWORD_RESET' },
-        });
-
-        await sendEmail(email, 'Reset Password', `<p>Your password reset code is: <b>${otp}</b></p>`);
-        return reply.send({ message: 'Reset code sent.' });
-    });
-
-    app.post('/auth/password/reset', async (req, reply) => {
-        const { email, code, newPassword } = req.body as any;
-        const record = await prisma.verificationToken.findUnique({ where: { identifier_type: { identifier: email, type: 'PASSWORD_RESET' } } });
-        
-        if (!record || record.token !== code || record.expires < new Date()) return reply.status(400).send({ error: 'Invalid or expired code' });
-
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await prisma.user.updateMany({ where: { email }, data: { passwordHash: hashedPassword } });
-        await prisma.verificationToken.delete({ where: { identifier_type: { identifier: email, type: 'PASSWORD_RESET' } } });
-
-        return reply.send({ message: 'Password reset successful' });
-    });
+interface AuthProps {
+  onLogin: (email: string, password: string) => Promise<boolean>;
+  onSignup: (user: UserProfile, tenant: Tenant, password: string, paymentRef?: string) => Promise<void>;
+  plans: Plan[];
 }
+
+export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
+  const navigate = useNavigate();
+  const [isLogin, setIsLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [userType, setUserType] = useState<'STAFF' | 'CLIENT'>('STAFF');
+
+  // Form State
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  
+  // Signup State
+  const [name, setName] = useState('');
+  const [clinicName, setClinicName] = useState('');
+  const [selectedPlan, setSelectedPlan] = useState('Professional');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // --- HANDLE CLIENT REDIRECT ---
+    if (userType === 'CLIENT') {
+      navigate('/portal/login');
+      return;
+    }
+
+    // --- HANDLE STAFF LOGIN/SIGNUP ---
+    setLoading(true);
+    try {
+      if (isLogin) {
+        await onLogin(email, password);
+      } else {
+        const planDetails = plans.find(p => p.name === selectedPlan);
+        if (!planDetails) return;
+        
+        await onSignup(
+          { id: '', tenantId: '', name, email, roles: ['Admin'], preferences: {} },
+          { id: '', name: clinicName, plan: selectedPlan, billingPeriod: 'Monthly', settings: {}, status: 'Active', joinedDate: new Date(), storageUsed: 0 },
+          password
+        );
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+      
+      {/* Left Side - Brand & Info */}
+      <div className="hidden md:flex md:w-1/2 bg-indigo-600 text-white p-12 flex-col justify-between relative overflow-hidden">
+        <div className="relative z-10">
+          <div className="flex items-center space-x-2 mb-8">
+            <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                <Stethoscope className="w-8 h-8" />
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">VetNexus</h1>
+          </div>
+          <h2 className="text-4xl font-extrabold mb-6 leading-tight">
+            The Modern OS for <br/> Veterinary Clinics
+          </h2>
+          <p className="text-indigo-100 text-lg max-w-md">
+            Streamline your practice with AI-powered records, inventory management, and a dedicated client portal.
+          </p>
+        </div>
+        
+        {/* Decorative Circles */}
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-indigo-500 rounded-full opacity-50 blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-indigo-700 rounded-full opacity-50 blur-3xl"></div>
+        
+        <div className="relative z-10 text-sm text-indigo-200">
+          © 2024 VetNexus Inc. All rights reserved.
+        </div>
+      </div>
+
+      {/* Right Side - Form */}
+      <div className="flex-1 flex items-center justify-center p-4 md:p-12">
+        <div className="w-full max-w-md space-y-8">
+          
+          {/* Mobile Header */}
+          <div className="md:hidden text-center mb-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-600 text-white mb-4 shadow-lg">
+              <Stethoscope className="w-6 h-6" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">VetNexus</h1>
+          </div>
+
+          {/* User Type Toggle */}
+          <div className="bg-white p-1 rounded-xl border border-gray-200 shadow-sm flex mb-6">
+            <button
+                type="button"
+                onClick={() => setUserType('STAFF')}
+                className={`flex-1 flex items-center justify-center py-2.5 text-sm font-medium rounded-lg transition-all ${
+                    userType === 'STAFF' 
+                    ? 'bg-indigo-600 text-white shadow-md' 
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+            >
+                <ShieldCheck className="w-4 h-4 mr-2" />
+                Clinic Staff
+            </button>
+            <button
+                type="button"
+                onClick={() => setUserType('CLIENT')}
+                className={`flex-1 flex items-center justify-center py-2.5 text-sm font-medium rounded-lg transition-all ${
+                    userType === 'CLIENT' 
+                    ? 'bg-blue-500 text-white shadow-md' 
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+            >
+                <User className="w-4 h-4 mr-2" />
+                Pet Owner
+            </button>
+          </div>
+
+          {/* Form Container */}
+          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+            
+            {userType === 'CLIENT' ? (
+                // --- CLIENT VIEW ---
+                <div className="text-center space-y-6">
+                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-500 mb-4">
+                        <PawPrint className="w-8 h-8" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-gray-900">Pet Owner Portal</h2>
+                        <p className="text-gray-500 mt-2 text-sm">
+                            Access your pet's medical records, book appointments, and view invoices.
+                        </p>
+                    </div>
+                    <button
+                        onClick={handleSubmit}
+                        className="w-full flex items-center justify-center py-3 px-4 rounded-xl text-white font-medium bg-blue-600 hover:bg-blue-700 transition-colors shadow-lg hover:shadow-blue-500/30"
+                    >
+                        Go to Client Login <ArrowRight className="w-4 h-4 ml-2" />
+                    </button>
+                    <div className="text-xs text-gray-400">
+                        Need an account? Contact your veterinary clinic.
+                    </div>
+                </div>
+            ) : (
+                // --- STAFF VIEW ---
+                <>
+                    <div className="mb-6">
+                        <h2 className="text-2xl font-bold text-gray-900">
+                            {isLogin ? 'Staff Login' : 'Create Clinic Account'}
+                        </h2>
+                        <p className="text-gray-500 text-sm mt-1">
+                            {isLogin ? 'Enter your credentials to access the workspace.' : 'Start your 14-day free trial.'}
+                        </p>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {!isLogin && (
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                                    <input required type="text" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Dr. John Doe" value={name} onChange={e => setName(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Clinic Name</label>
+                                    <input required type="text" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Happy Pets Clinic" value={clinicName} onChange={e => setClinicName(e.target.value)} />
+                                </div>
+                            </>
+                        )}
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                            <input required type="email" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="doctor@clinic.com" value={email} onChange={e => setEmail(e.target.value)} />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <input required type="password" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+                        </div>
+
+                        <button 
+                            type="submit" 
+                            disabled={loading}
+                            className="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-all shadow-lg hover:shadow-indigo-500/30 flex justify-center items-center"
+                        >
+                            {loading ? <Loader2 className="animate-spin w-5 h-5" /> : (isLogin ? 'Sign In' : 'Create Account')}
+                        </button>
+                    </form>
+
+                    <div className="mt-6 text-center">
+                        <button 
+                            type="button"
+                            onClick={() => setIsLogin(!isLogin)}
+                            className="text-sm text-indigo-600 font-medium hover:text-indigo-800"
+                        >
+                            {isLogin ? "New clinic? Create an account" : "Already have an account? Sign in"}
+                        </button>
+                    </div>
+                </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -4,26 +4,27 @@ import axios from 'axios';
 const PRODUCTION_API_URL = 'https://vetnexus-backend.onrender.com/api';
 const LOCAL_API_URL = 'http://localhost:4000/api';
 
-// Use environment variable if available, otherwise fallback based on mode
-const baseURL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' 
+const baseURL = import.meta.env.MODE === 'production' 
   ? PRODUCTION_API_URL
-  : LOCAL_API_URL);
+  : LOCAL_API_URL;
 
 console.log("API Configured to:", baseURL);
 
 const api = axios.create({
   baseURL,
-  withCredentials: true, // Keep this if you use cookies, but usually Token is enough
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   }
 });
 
-// --- 1. REQUEST INTERCEPTOR (The Fix for 401s) ---
-// This attaches the token to every request automatically
+// =================================================================
+// 1. REQUEST INTERCEPTOR (CRITICAL FIX)
+// This was missing. It attaches the token to every request.
+// =================================================================
 api.interceptors.request.use(
   (config) => {
-    // Check both standard keys. Adjust 'token' to match what you use in Login.tsx
+    // We check for 'token' (standard) or 'authToken' just in case
     const token = localStorage.getItem('token') || localStorage.getItem('authToken');
     
     if (token) {
@@ -36,7 +37,10 @@ api.interceptors.request.use(
   }
 );
 
-// --- 2. RESPONSE INTERCEPTOR ---
+// =================================================================
+// 2. RESPONSE INTERCEPTOR
+// Handles global errors like session expiry
+// =================================================================
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -44,15 +48,16 @@ api.interceptors.response.use(
         console.error(`API Request failed on: ${error.config.url}`);
     }
 
-    // Handle Session Expiry (Auto Logout)
+    // If 401 (Unauthorized), the token is likely invalid/expired.
     if (error.response?.status === 401) {
-        // Optional: Only clear if it's not the login endpoint itself
+        // Don't wipe storage if we are just failing to login (invalid password)
         if (!error.config.url.includes('/login')) {
+            console.warn('Session expired or invalid. Logging out...');
             localStorage.removeItem('token');
             localStorage.removeItem('authToken');
             localStorage.removeItem('user');
-            // Optional: Force reload to login page
-            // window.location.href = '/login'; 
+            // Optional: Redirect to login page
+            // window.location.href = '/login';
         }
     }
 
@@ -68,6 +73,7 @@ export const AuthService = {
   signup: (data: any, paymentRef?: string) => api.post('/auth/signup', { ...data, paymentRef }),
   logout: () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     return api.post('/auth/logout');
   },
@@ -102,6 +108,7 @@ export const OwnerService = {
   create: (data: any) => api.post('/owners', data),
   update: (id: string, data: any) => api.patch(`/owners/${id}`, data),
   delete: (id: string) => api.delete(`/owners/${id}`),
+  // Update Portal Access
   updatePortalAccess: (id: string, data: { password?: string, isActive: boolean }) => api.patch(`/owners/${id}/portal`, data),
 };
 

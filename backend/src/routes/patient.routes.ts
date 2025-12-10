@@ -1,50 +1,50 @@
-import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { FastifyInstance } from 'fastify';
+import { prisma } from '../lib/prisma';
 
-const router = Router();
-const prisma = new PrismaClient();
+export async function patientRoutes(app: FastifyInstance) {
+  
+  // GET ALL PATIENTS
+  app.get('/', async (request, reply) => {
+    try {
+      const pets = await prisma.pet.findMany({
+        orderBy: { createdAt: 'desc' }
+      });
+      return reply.send(pets);
+    } catch (error) {
+      request.log.error(error);
+      return reply.status(500).send({ error: 'Failed to fetch patients' });
+    }
+  });
 
-// Get all patients
-router.get('/', async (req, res) => {
-  try {
-    const pets = await prisma.pet.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json(pets);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch patients' });
-  }
-});
-
-// Create a new Patient (Fixes "Add Pet" button)
-router.post('/', async (req, res) => {
-  try {
+  // CREATE PATIENT
+  app.post('/', async (request, reply) => {
     const { 
       name, species, breed, age, gender, 
       ownerId, color, initialWeight, allergies 
-    } = req.body;
+    } = request.body as any;
 
-    const pet = await prisma.pet.create({
-      data: {
-        tenantId: 'system', // Replace with actual tenant ID logic
-        name,
-        species,
-        breed,
-        age: Number(age),
-        gender,
-        ownerId,
-        color,
-        // Store weight in vitals history JSON or separate field if you added it
-        initialWeight: Number(initialWeight), 
-        allergies: JSON.stringify(allergies || []), // Prisma stores JSON strings for simple arrays if defined as String
-        imageUrl: `https://ui-avatars.com/api/?name=${name}&background=random`
-      }
-    });
-    res.json(pet);
-  } catch (error) {
-    console.error("Create Pet Error:", error);
-    res.status(500).json({ error: 'Failed to create patient' });
-  }
-});
-
-export default router;
+    try {
+      const pet = await prisma.pet.create({
+        data: {
+          tenantId: 'system', // Replace with request.user.tenantId if auth enabled
+          name,
+          species,
+          breed,
+          age: Number(age) || 0,
+          gender,
+          ownerId,
+          color,
+          // Ensure these fields exist in your schema.prisma
+          // If initialWeight gives an error, remove it or ensure schema has 'initialWeight Float'
+          initialWeight: initialWeight ? Number(initialWeight) : 0, 
+          allergies: Array.isArray(allergies) ? JSON.stringify(allergies) : (allergies || "[]"),
+          imageUrl: `https://ui-avatars.com/api/?name=${name}&background=random`
+        }
+      });
+      return reply.send(pet);
+    } catch (error) {
+      request.log.error(error);
+      return reply.status(500).send({ error: 'Failed to create patient' });
+    }
+  });
+}

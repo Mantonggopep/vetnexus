@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // Added for redirection
+import { useNavigate } from 'react-router-dom';
 import { Tenant, UserProfile, SubscriptionTier, BillingPeriod, SubscriptionPlan } from '../types';
-import { Shield, Mail, Lock, AlertCircle, User, ShieldCheck, PawPrint } from 'lucide-react'; // Added icons
-import { ClientPortalService } from '../services/api'; // Added for Client Login
+import { Shield, Mail, Lock, AlertCircle, User, ShieldCheck, PawPrint } from 'lucide-react';
+import { ClientPortalService } from '../services/api';
 
 interface AuthProps {
   onLogin: (email: string, password: string) => Promise<boolean>;
@@ -78,17 +78,38 @@ declare global {
     }
 }
 
+// HELPER: Map Countries to Currencies
+const getCurrencyForCountry = (country: string): string => {
+    const map: Record<string, string> = {
+        'Nigeria': 'NGN', 'Ghana': 'GHS', 'Kenya': 'KES', 'South Africa': 'ZAR',
+        'USA': 'USD', 'Canada': 'CAD', 'United Kingdom': 'GBP',
+        
+        // Eurozone
+        'France': 'EUR', 'Germany': 'EUR', 'Italy': 'EUR', 'Spain': 'EUR', 
+        'Netherlands': 'EUR', 'Belgium': 'EUR', 'Portugal': 'EUR', 'Ireland': 'EUR', 
+        'Austria': 'EUR', 'Finland': 'EUR',
+        
+        // West African CFA Franc
+        'Benin': 'XOF', 'Burkina Faso': 'XOF', 'Côte d\'Ivoire': 'XOF', 
+        'Guinea-Bissau': 'XOF', 'Mali': 'XOF', 'Niger': 'XOF', 'Senegal': 'XOF', 'Togo': 'XOF',
+        
+        // Others
+        'Switzerland': 'CHF', 'Sweden': 'SEK', 'Norway': 'NOK', 'Denmark': 'DKK'
+    };
+    return map[country] || 'USD'; // Default to USD
+};
+
 export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_PLANS }) => {
-  const navigate = useNavigate(); // Added navigation
+  const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   
-  // --- NEW: USER TYPE TOGGLE ---
+  // --- USER TYPE TOGGLE ---
   const [userType, setUserType] = useState<'STAFF' | 'CLIENT'>('STAFF');
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [isLoggingIn, setIsLoggingIn] = useState(false); // Loading state for login
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const [step, setStep] = useState(1);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -132,7 +153,6 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_P
       }
   };
 
-  // ... (Existing Payment Logic remains unchanged) ...
   const handlePaymentAndSignup = async () => {
       const configKey = `${signupData.plan}_${signupData.billingPeriod}`;
       const planConfig = FLUTTERWAVE_CONFIG[configKey];
@@ -161,10 +181,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_P
           return;
       }
 
-      const currencyMap: Record<string, string> = {
-        'Nigeria': 'NGN', 'USA': 'USD', 'UK': 'GBP', 'Ghana': 'GHS', 'Kenya': 'KES'
-      };
-      const selectedCurrency = currencyMap[signupData.country] || 'NGN';
+      const selectedCurrency = getCurrencyForCountry(signupData.country);
 
       setIsProcessingPayment(true);
       const txRef = `vnx-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -209,10 +226,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_P
   };
 
   const completeSignup = (paymentRef: string) => {
-      const currencyMap: Record<string, string> = {
-        'Nigeria': 'NGN', 'USA': 'USD', 'UK': 'GBP', 'Ghana': 'GHS', 'Kenya': 'KES'
-      };
-      const currency = currencyMap[signupData.country] || 'NGN';
+      const currency = getCurrencyForCountry(signupData.country);
       const tenantId = `tenant-${Date.now()}`;
       
       const newTenant: Tenant = {
@@ -221,7 +235,8 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_P
           plan: signupData.plan,
           billingPeriod: signupData.billingPeriod,
           settings: {
-              currency: currency, timezone: 'UTC',
+              currency: currency,
+              // Fixed: Removed 'timezone' property causing TS error
               // @ts-ignore
               name: signupData.clinicName, address: '', phone: '', email: signupData.email, website: '',
               taxRate: 7.5, bankDetails: '',
@@ -233,7 +248,12 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_P
       };
 
       const newUser: UserProfile = {
-          id: `u-${Date.now()}`, name: signupData.name, email: signupData.email, roles: ['Admin'], tenantId: tenantId, preferences: {}
+          id: `u-${Date.now()}`, 
+          name: signupData.name, 
+          email: signupData.email, 
+          roles: ['Admin'], 
+          tenantId: tenantId
+          // Fixed: Removed 'preferences' property causing TS error
       };
 
       onSignup(newUser, newTenant, signupData.password, paymentRef);
@@ -332,7 +352,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_P
       );
   }
 
-  // SIGNUP WIZARD (Strictly for Staff/Tenants)
+  // SIGNUP WIZARD
   return (
       <div className="min-h-screen bg-teal-50 flex flex-col items-center justify-center p-4">
           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-5xl border border-teal-100 overflow-hidden flex flex-col md:flex-row h-[700px] animate-fade-in-up">
@@ -373,11 +393,47 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_P
                               <input type="text" required className="w-full p-4 bg-slate-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none transition-all font-semibold" placeholder="Clinic Name" value={signupData.clinicName} onChange={e => setSignupData({...signupData, clinicName: e.target.value})} />
                               <div className="relative">
                                 <select className="w-full p-4 bg-slate-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none transition-all font-semibold appearance-none" value={signupData.country} onChange={e => setSignupData({...signupData, country: e.target.value})}>
-                                    <option value="Nigeria">Nigeria</option>
-                                    <option value="USA">USA</option>
-                                    <option value="UK">UK</option>
-                                    <option value="Ghana">Ghana</option>
-                                    <option value="Kenya">Kenya</option>
+                                    <optgroup label="West Africa">
+                                        <option value="Nigeria">Nigeria</option>
+                                        <option value="Ghana">Ghana</option>
+                                        <option value="Benin">Benin</option>
+                                        <option value="Burkina Faso">Burkina Faso</option>
+                                        <option value="Cape Verde">Cape Verde</option>
+                                        <option value="Côte d'Ivoire">Côte d'Ivoire (Ivory Coast)</option>
+                                        <option value="Gambia">Gambia</option>
+                                        <option value="Guinea">Guinea</option>
+                                        <option value="Guinea-Bissau">Guinea-Bissau</option>
+                                        <option value="Liberia">Liberia</option>
+                                        <option value="Mali">Mali</option>
+                                        <option value="Niger">Niger</option>
+                                        <option value="Senegal">Senegal</option>
+                                        <option value="Sierra Leone">Sierra Leone</option>
+                                        <option value="Togo">Togo</option>
+                                    </optgroup>
+                                    <optgroup label="Major Europe">
+                                        <option value="United Kingdom">United Kingdom</option>
+                                        <option value="France">France</option>
+                                        <option value="Germany">Germany</option>
+                                        <option value="Italy">Italy</option>
+                                        <option value="Spain">Spain</option>
+                                        <option value="Portugal">Portugal</option>
+                                        <option value="Netherlands">Netherlands</option>
+                                        <option value="Belgium">Belgium</option>
+                                        <option value="Switzerland">Switzerland</option>
+                                        <option value="Sweden">Sweden</option>
+                                        <option value="Norway">Norway</option>
+                                        <option value="Denmark">Denmark</option>
+                                        <option value="Ireland">Ireland</option>
+                                        <option value="Austria">Austria</option>
+                                        <option value="Poland">Poland</option>
+                                        <option value="Finland">Finland</option>
+                                    </optgroup>
+                                    <optgroup label="North America & Others">
+                                        <option value="USA">USA</option>
+                                        <option value="Canada">Canada</option>
+                                        <option value="Kenya">Kenya</option>
+                                        <option value="South Africa">South Africa</option>
+                                    </optgroup>
                                 </select>
                                 <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">▼</div>
                               </div>

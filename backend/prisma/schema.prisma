@@ -60,20 +60,18 @@ model User {
   roles        String  @default("[\"Veterinarian\"]")
   avatarUrl    String?
   isSuspended  Boolean @default(false)
-  // New field to track verification status
   isVerified   Boolean @default(false) 
 }
 
-// Handles Email Verification and Password Resets
 model VerificationToken {
   id         String   @id @default(uuid())
-  identifier String   // The email address
-  token      String   // The OTP or Hash
-  type       String   // "EMAIL_VERIFICATION" or "PASSWORD_RESET"
+  identifier String
+  token      String
+  type       String
   expires    DateTime
   createdAt  DateTime @default(now())
 
-  @@unique([identifier, type]) // Ensure only one active token type per email
+  @@unique([identifier, type])
 }
 
 model Owner {
@@ -86,7 +84,11 @@ model Owner {
   phone        String
   address      String?
   
-  // ADDED: Fixes sorting by newest clients
+  // CLIENT PORTAL FEATURES
+  passwordHash   String?  // Allows client to log in
+  isPortalActive Boolean  @default(false) // Toggle access
+  lastLogin      DateTime?
+
   createdAt    DateTime @default(now())
 
   pets         Pet[]
@@ -117,7 +119,6 @@ model Pet {
   reminders         String   @default("[]")
   vaccinations      String   @default("[]")
 
-  // ADDED: Useful for sorting patients
   createdAt         DateTime @default(now())
 
   appointments      Appointment[]
@@ -196,7 +197,7 @@ model InventoryItem {
   tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name           String
   category       String
-  type           String
+  type           String    @default("Product")
   sku            String
   stock          Int       @default(0)
   purchasePrice  Float     @default(0)
@@ -204,6 +205,12 @@ model InventoryItem {
   wholesalePrice Float     @default(0)
   reorderLevel   Int       @default(5)
   expiryDate     String?
+  
+  // ADDED FIELDS
+  unit           String?   @default("pcs")
+  location       String?
+  batchNumber    String?
+  supplier       String?
 }
 
 model SaleRecord {

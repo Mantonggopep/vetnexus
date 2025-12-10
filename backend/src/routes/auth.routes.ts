@@ -1,275 +1,260 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plan, UserProfile, Tenant } from '../types';
-import { Loader2, Stethoscope, PawPrint, ArrowRight, ShieldCheck, User, AlertCircle } from 'lucide-react';
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { prisma } from '../lib/prisma';
 
-interface AuthProps {
-  onLogin: (email: string, password: string) => Promise<boolean>;
-  onSignup: (user: UserProfile, tenant: Tenant, password: string, paymentRef?: string) => Promise<void>;
-  plans: Plan[];
+// --- CONFIGURATION ---
+const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
+
+// --- TYPES ---
+interface LoginBody {
+  email: string;
+  password: string;
 }
 
-export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = [] }) => {
-  const navigate = useNavigate();
-  
-  // --- STATE ---
-  const [isLogin, setIsLogin] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [userType, setUserType] = useState<'STAFF' | 'CLIENT'>('STAFF');
-  const [error, setError] = useState<string | null>(null);
+interface SignupBody {
+  name: string;
+  email: string;
+  password: string;
+  clinicName?: string;
+}
 
-  // Form State
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  
-  // Signup State
-  const [name, setName] = useState('');
-  const [clinicName, setClinicName] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState('Professional'); 
+export async function authRoutes(app: FastifyInstance) {
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    
-    // --- HANDLE CLIENT REDIRECT ---
-    if (userType === 'CLIENT') {
-      navigate('/portal/login');
-      return;
-    }
-
-    // --- HANDLE STAFF LOGIN/SIGNUP ---
-    setLoading(true);
-    try {
-      if (isLogin) {
-        await onLogin(email, password);
-      } else {
-        // Find selected plan or default to first available
-        const planDetails = plans.find(p => p.name === selectedPlan) || plans[0];
-        const planName = planDetails?.name || 'Trial';
-        
-        // Construct the Tenant Object (Clinic)
-        const newTenant: Tenant = {
-            id: '', 
-            name: clinicName, 
-            plan: planName as any, 
-            billingPeriod: 'Monthly', 
-            settings: {
-                name: clinicName,
-                address: '',
-                phone: '',
-                email: email,
-                website: '',
-                taxRate: 0,
-                currency: 'USD',
-                bankDetails: '',
-                clientPrefix: 'CL',
-                invoicePrefix: 'INV',
-                receiptPrefix: 'REC',
-                patientPrefix: 'PT',
-            }, 
-            status: 'Active', 
-            joinedDate: new Date().toISOString(), 
-            storageUsed: 0 
-        };
-
-        // Construct the User Object (Admin)
-        const newUser: UserProfile = { 
-            id: '', 
-            tenantId: '', 
-            name, 
-            email, 
-            roles: ['SuperAdmin'] 
-        };
-
-        await onSignup(newUser, newTenant, password);
+  // =================================================================
+  // LOGIN
+  // =================================================================
+  app.post<{ Body: LoginBody }>('/login', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['email', 'password'],
+        properties: {
+          email: { type: 'string', format: 'email' },
+          password: { type: 'string', minLength: 6 }
+        }
       }
-    } catch (err: any) {
-      console.error("Auth Error:", err);
-      // Display a friendly error message
-      setError(err.message || err.response?.data?.error || "Authentication failed. Please check your credentials.");
-    } finally {
-      setLoading(false);
     }
-  };
+  }, async (request, reply) => {
+    const { email, password } = request.body;
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row animate-fade-in">
+    try {
+      // 1. Find User
+      const user = await prisma.user.findUnique({
+        where: { email },
+        include: { tenant: true }
+      });
+
+      if (!user) {
+        return reply.status(401).send({ error: 'Invalid credentials' });
+      }
+
+      // 2. Check Password
+      const isMatch = await bcrypt.compare(password, user.passwordHash);
+      if (!isMatch) {
+        return reply.status(401).send({ error: 'Invalid credentials' });
+      }
+
+      // 3. Parse Roles Safely
+      let roles: string[] = [];
+      try {
+        roles = JSON.parse(user.roles);
+      } catch (e) {
+        roles = ['Veterinarian']; // Fallback
+      }
+
+      // 4. Generate Token
+      const token = jwt.sign(
+        { userId: user.id, tenantId: user.tenantId, roles },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      // 5. Set Cookie
+      reply.setCookie('token', token, {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // Secure in Prod
+        sameSite: 'lax',
+        maxAge: COOKIE_MAX_AGE
+      });
+
+      // 6. Return Data
+      return reply.send({
+        success: true,
+        token,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          roles,
+          tenantId: user.tenantId,
+          avatarUrl: user.avatarUrl
+        },
+        tenant: user.tenant
+      });
+
+    } catch (error) {
+      request.log.error(error);
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // =================================================================
+  // SIGNUP
+  // =================================================================
+  app.post<{ Body: SignupBody }>('/signup', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['name', 'email', 'password'],
+        properties: {
+          name: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+          password: { type: 'string', minLength: 6 },
+          clinicName: { type: 'string' }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    const { name, email, password, clinicName } = request.body;
+
+    try {
+      // 1. Check if user exists
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+        return reply.status(400).send({ error: 'User already exists' });
+      }
+
+      // 2. Hash Password
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(password, salt);
+
+      // 3. Transaction: Create Tenant & User
+      const result = await prisma.$transaction(async (tx) => {
+        // Create Tenant
+        const newTenant = await tx.tenant.create({
+          data: {
+            name: clinicName || `${name}'s Clinic`,
+            plan: 'Trial',
+            status: 'Active',
+            settings: JSON.stringify({ currency: 'USD', timezone: 'UTC' })
+          }
+        });
+
+        // Create User
+        const newUser = await tx.user.create({
+          data: {
+            tenantId: newTenant.id,
+            name,
+            email,
+            passwordHash,
+            roles: JSON.stringify(['Admin']),
+            isVerified: false
+          }
+        });
+
+        return { newTenant, newUser };
+      });
+
+      // 4. Generate Token
+      const token = jwt.sign(
+        { userId: result.newUser.id, tenantId: result.newTenant.id, roles: ['Admin'] },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      // 5. Set Cookie
+      reply.setCookie('token', token, {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: COOKIE_MAX_AGE
+      });
+
+      return reply.send({
+        success: true,
+        message: 'Account created successfully',
+        token,
+        user: {
+            id: result.newUser.id,
+            name: result.newUser.name,
+            email: result.newUser.email,
+            roles: ['Admin'],
+            tenantId: result.newUser.tenantId
+        },
+        tenant: result.newTenant
+      });
+
+    } catch (error) {
+      request.log.error(error);
+      return reply.status(500).send({ error: 'Signup failed' });
+    }
+  });
+
+  // =================================================================
+  // LOGOUT
+  // =================================================================
+  app.post('/logout', async (request, reply) => {
+    reply.clearCookie('token', { path: '/' });
+    return reply.send({ success: true, message: 'Logged out successfully' });
+  });
+
+  // =================================================================
+  // GET CURRENT USER (ME)
+  // =================================================================
+  app.get('/me', async (request, reply) => {
+    try {
+      // 1. Extract Token
+      const authHeader = request.headers.authorization;
+      const cookieToken = request.cookies.token;
       
-      {/* Left Side - Brand & Info */}
-      <div className="hidden md:flex md:w-1/2 bg-indigo-600 text-white p-12 flex-col justify-between relative overflow-hidden">
-        <div className="relative z-10">
-          <div className="flex items-center space-x-2 mb-8">
-            <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
-                <Stethoscope className="w-8 h-8" />
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight">VetNexus</h1>
-          </div>
-          <h2 className="text-4xl font-extrabold mb-6 leading-tight">
-            The Modern OS for <br/> Veterinary Clinics
-          </h2>
-          <p className="text-indigo-100 text-lg max-w-md">
-            Streamline your practice with AI-powered records, inventory management, and a dedicated client portal.
-          </p>
-        </div>
-        
-        {/* Decorative Background Elements */}
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-indigo-500 rounded-full opacity-50 blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-indigo-700 rounded-full opacity-50 blur-3xl"></div>
-        
-        <div className="relative z-10 text-sm text-indigo-200">
-          © 2024 VetNexus Inc. All rights reserved.
-        </div>
-      </div>
+      let token;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      } else if (cookieToken) {
+        token = cookieToken;
+      }
 
-      {/* Right Side - Form */}
-      <div className="flex-1 flex items-center justify-center p-4 md:p-12">
-        <div className="w-full max-w-md space-y-8">
-          
-          {/* Mobile Header (Visible only on small screens) */}
-          <div className="md:hidden text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-600 text-white mb-4 shadow-lg">
-              <Stethoscope className="w-6 h-6" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900">VetNexus</h1>
-          </div>
+      if (!token) {
+        return reply.status(401).send({ error: 'Not authenticated' });
+      }
 
-          {/* User Type Toggle (Staff vs Client) */}
-          <div className="bg-white p-1 rounded-xl border border-gray-200 shadow-sm flex mb-6">
-            <button
-                type="button"
-                onClick={() => { setUserType('STAFF'); setError(null); }}
-                className={`flex-1 flex items-center justify-center py-2.5 text-sm font-medium rounded-lg transition-all ${
-                    userType === 'STAFF' 
-                    ? 'bg-indigo-600 text-white shadow-md' 
-                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-            >
-                <ShieldCheck className="w-4 h-4 mr-2" />
-                Clinic Staff
-            </button>
-            <button
-                type="button"
-                onClick={() => { setUserType('CLIENT'); setError(null); }}
-                className={`flex-1 flex items-center justify-center py-2.5 text-sm font-medium rounded-lg transition-all ${
-                    userType === 'CLIENT' 
-                    ? 'bg-blue-500 text-white shadow-md' 
-                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-            >
-                <User className="w-4 h-4 mr-2" />
-                Pet Owner
-            </button>
-          </div>
+      // 2. Verify Token
+      const decoded: any = jwt.verify(token, JWT_SECRET);
 
-          {/* Main Form Card */}
-          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
-            
-            {userType === 'CLIENT' ? (
-                // --- CLIENT PORTAL VIEW ---
-                <div className="text-center space-y-6">
-                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-500 mb-4 animate-bounce-slow">
-                        <PawPrint className="w-8 h-8" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-900">Pet Owner Portal</h2>
-                        <p className="text-gray-500 mt-2 text-sm">
-                            Access your pet's medical records, book appointments, and view invoices.
-                        </p>
-                    </div>
-                    <button
-                        onClick={handleSubmit}
-                        className="w-full flex items-center justify-center py-3 px-4 rounded-xl text-white font-medium bg-blue-600 hover:bg-blue-700 transition-colors shadow-lg hover:shadow-blue-500/30"
-                    >
-                        Go to Client Login <ArrowRight className="w-4 h-4 ml-2" />
-                    </button>
-                    <div className="text-xs text-gray-400">
-                        Need an account? Contact your veterinary clinic.
-                    </div>
-                </div>
-            ) : (
-                // --- STAFF LOGIN/SIGNUP VIEW ---
-                <>
-                    <div className="mb-6">
-                        <h2 className="text-2xl font-bold text-gray-900">
-                            {isLogin ? 'Staff Login' : 'Create Clinic Account'}
-                        </h2>
-                        <p className="text-gray-500 text-sm mt-1">
-                            {isLogin ? 'Enter your credentials to access the workspace.' : 'Start your 14-day free trial.'}
-                        </p>
-                    </div>
+      // 3. Fetch Fresh Data
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        include: { tenant: true }
+      });
 
-                    {/* Error Display */}
-                    {error && (
-                        <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2 text-sm text-red-600 animate-pulse">
-                            <AlertCircle className="w-5 h-5 shrink-0" />
-                            <span className="break-words">{error}</span>
-                        </div>
-                    )}
+      if (!user) {
+        return reply.status(401).send({ error: 'User not found' });
+      }
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {!isLogin && (
-                            <>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                                    <input required type="text" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="Dr. John Doe" value={name} onChange={e => setName(e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Clinic Name</label>
-                                    <input required type="text" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="Happy Pets Clinic" value={clinicName} onChange={e => setClinicName(e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Select Plan</label>
-                                    <select 
-                                        className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none bg-white transition-all"
-                                        value={selectedPlan}
-                                        onChange={e => setSelectedPlan(e.target.value)}
-                                        disabled={plans.length === 0}
-                                    >
-                                        {plans.length > 0 ? (
-                                            plans.map(plan => (
-                                                <option key={plan.id} value={plan.name}>{plan.name}</option>
-                                            ))
-                                        ) : (
-                                            <option value="Professional">Professional (Default)</option>
-                                        )}
-                                    </select>
-                                </div>
-                            </>
-                        )}
-                        
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                            <input required type="email" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="doctor@clinic.com" value={email} onChange={e => setEmail(e.target.value)} />
-                        </div>
+      // 4. Parse Roles
+      let roles: string[] = [];
+      try {
+        roles = JSON.parse(user.roles);
+      } catch (e) {
+        roles = [];
+      }
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                            <input required type="password" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
-                        </div>
+      return reply.send({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        roles,
+        tenantId: user.tenantId,
+        avatarUrl: user.avatarUrl,
+        tenant: user.tenant
+      });
 
-                        <button 
-                            type="submit" 
-                            disabled={loading}
-                            className="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-all shadow-lg hover:shadow-indigo-500/30 flex justify-center items-center disabled:opacity-70 disabled:cursor-not-allowed"
-                        >
-                            {loading ? <Loader2 className="animate-spin w-5 h-5" /> : (isLogin ? 'Sign In' : 'Create Account')}
-                        </button>
-                    </form>
-
-                    <div className="mt-6 text-center">
-                        <button 
-                            type="button"
-                            onClick={() => { setIsLogin(!isLogin); setError(null); }}
-                            className="text-sm text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
-                        >
-                            {isLogin ? "New clinic? Create an account" : "Already have an account? Sign in"}
-                        </button>
-                    </div>
-                </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+    } catch (error) {
+      return reply.status(401).send({ error: 'Invalid or expired token' });
+    }
+  });
+}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plan, UserProfile, Tenant } from '../types';
-import { Loader2, Stethoscope, PawPrint, ArrowRight, ShieldCheck, User } from 'lucide-react';
+import { Loader2, Stethoscope, PawPrint, ArrowRight, ShieldCheck, User, AlertCircle } from 'lucide-react';
 
 interface AuthProps {
   onLogin: (email: string, password: string) => Promise<boolean>;
@@ -11,9 +11,12 @@ interface AuthProps {
 
 export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
   const navigate = useNavigate();
+  
+  // --- STATE ---
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [userType, setUserType] = useState<'STAFF' | 'CLIENT'>('STAFF');
+  const [error, setError] = useState<string | null>(null);
 
   // Form State
   const [email, setEmail] = useState('');
@@ -22,13 +25,16 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
   // Signup State
   const [name, setName] = useState('');
   const [clinicName, setClinicName] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState('Professional');
+  const [selectedPlan, setSelectedPlan] = useState('Professional'); // Default plan
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     // --- HANDLE CLIENT REDIRECT ---
     if (userType === 'CLIENT') {
+      // Redirect to the dedicated Client Portal Login page
+      // Make sure you have a route for this in App.tsx!
       navigate('/portal/login');
       return;
     }
@@ -39,24 +45,53 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
       if (isLogin) {
         await onLogin(email, password);
       } else {
-        const planDetails = plans.find(p => p.name === selectedPlan);
-        if (!planDetails) return;
+        const planDetails = plans.find(p => p.name === selectedPlan) || plans[0];
         
-        await onSignup(
-          { id: '', tenantId: '', name, email, roles: ['Admin'], preferences: {} },
-          { id: '', name: clinicName, plan: selectedPlan, billingPeriod: 'Monthly', settings: {}, status: 'Active', joinedDate: new Date(), storageUsed: 0 },
-          password
-        );
+        // Construct the Tenant Object
+        const newTenant: Tenant = {
+            id: '', 
+            name: clinicName, 
+            plan: (planDetails?.name as any) || 'Trial', 
+            billingPeriod: 'Monthly', 
+            settings: {
+                name: clinicName,
+                address: '',
+                phone: '',
+                email: email,
+                website: '',
+                taxRate: 0,
+                currency: 'USD',
+                bankDetails: '',
+                clientPrefix: 'CL',
+                invoicePrefix: 'INV',
+                receiptPrefix: 'REC',
+                patientPrefix: 'PT',
+            }, 
+            status: 'Active', 
+            joinedDate: new Date().toISOString(), 
+            storageUsed: 0 
+        };
+
+        const newUser: UserProfile = { 
+            id: '', 
+            tenantId: '', 
+            name, 
+            email, 
+            roles: ['SuperAdmin'] // First user is always SuperAdmin
+        };
+
+        await onSignup(newUser, newTenant, password);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error("Auth Error:", err);
+      setError(err.message || "Authentication failed. Please check your credentials.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row animate-fade-in">
       
       {/* Left Side - Brand & Info */}
       <div className="hidden md:flex md:w-1/2 bg-indigo-600 text-white p-12 flex-col justify-between relative overflow-hidden">
@@ -100,7 +135,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
           <div className="bg-white p-1 rounded-xl border border-gray-200 shadow-sm flex mb-6">
             <button
                 type="button"
-                onClick={() => setUserType('STAFF')}
+                onClick={() => { setUserType('STAFF'); setError(null); }}
                 className={`flex-1 flex items-center justify-center py-2.5 text-sm font-medium rounded-lg transition-all ${
                     userType === 'STAFF' 
                     ? 'bg-indigo-600 text-white shadow-md' 
@@ -112,7 +147,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
             </button>
             <button
                 type="button"
-                onClick={() => setUserType('CLIENT')}
+                onClick={() => { setUserType('CLIENT'); setError(null); }}
                 className={`flex-1 flex items-center justify-center py-2.5 text-sm font-medium rounded-lg transition-all ${
                     userType === 'CLIENT' 
                     ? 'bg-blue-500 text-white shadow-md' 
@@ -130,7 +165,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
             {userType === 'CLIENT' ? (
                 // --- CLIENT VIEW ---
                 <div className="text-center space-y-6">
-                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-500 mb-4">
+                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-500 mb-4 animate-bounce-slow">
                         <PawPrint className="w-8 h-8" />
                     </div>
                     <div>
@@ -161,6 +196,14 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
                         </p>
                     </div>
 
+                    {/* Error Message */}
+                    {error && (
+                        <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2 text-sm text-red-600">
+                            <AlertCircle className="w-5 h-5 shrink-0" />
+                            <span>{error}</span>
+                        </div>
+                    )}
+
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {!isLogin && (
                             <>
@@ -171,6 +214,18 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Clinic Name</label>
                                     <input required type="text" className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Happy Pets Clinic" value={clinicName} onChange={e => setClinicName(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Select Plan</label>
+                                    <select 
+                                        className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                        value={selectedPlan}
+                                        onChange={e => setSelectedPlan(e.target.value)}
+                                    >
+                                        {plans.map(plan => (
+                                            <option key={plan.id} value={plan.name}>{plan.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </>
                         )}
@@ -188,7 +243,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
                         <button 
                             type="submit" 
                             disabled={loading}
-                            className="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-all shadow-lg hover:shadow-indigo-500/30 flex justify-center items-center"
+                            className="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-all shadow-lg hover:shadow-indigo-500/30 flex justify-center items-center disabled:opacity-70 disabled:cursor-not-allowed"
                         >
                             {loading ? <Loader2 className="animate-spin w-5 h-5" /> : (isLogin ? 'Sign In' : 'Create Account')}
                         </button>
@@ -197,7 +252,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans }) => {
                     <div className="mt-6 text-center">
                         <button 
                             type="button"
-                            onClick={() => setIsLogin(!isLogin)}
+                            onClick={() => { setIsLogin(!isLogin); setError(null); }}
                             className="text-sm text-indigo-600 font-medium hover:text-indigo-800"
                         >
                             {isLogin ? "New clinic? Create an account" : "Already have an account? Sign in"}

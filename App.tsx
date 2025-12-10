@@ -19,7 +19,7 @@ import PageTransition from './components/PageTransition';
 import DynamicIsland, { ToastType } from './components/DynamicIsland';
 import SpotlightSearch from './components/SpotlightSearch';
 import { Auth } from './components/Auth';
-import { LogOut, User as UserIcon, Search, Home } from 'lucide-react';
+import { LogOut, User as UserIcon, Search, Home, Menu } from 'lucide-react';
 import { AuthService, PatientService, OwnerService, InventoryService, AppointmentService, SaleService, ConsultationService, LabService, ExpenseService, PlanService, UserService, BranchService, SettingsService, LogService } from './services/api';
 import { getAvatarGradient } from './utils/uiUtils';
 
@@ -28,18 +28,10 @@ import { AppState, ViewType, SaleRecord, InventoryItem, LabResult, ClinicSetting
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  
-  // --- Initialize from Local Storage ---
-  const [currentView, setCurrentView] = useState<ViewType>(() => {
-      const savedView = localStorage.getItem('vet_nexus_current_view');
-      return (savedView as ViewType) || 'dashboard';
-  });
-
-  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(() => {
-      return localStorage.getItem('vet_nexus_selected_patient_id');
-  });
-
+  const [currentView, setCurrentView] = useState<ViewType>('dashboard');
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
   const [toast, setToast] = useState<{ type: ToastType; message: string; visible: boolean }>({
       type: 'info', message: '', visible: false
@@ -50,19 +42,6 @@ const App: React.FC = () => {
   };
 
   const hideToast = () => setToast(prev => ({ ...prev, visible: false }));
-
-  // --- Persist View State Changes ---
-  useEffect(() => {
-      localStorage.setItem('vet_nexus_current_view', currentView);
-  }, [currentView]);
-
-  useEffect(() => {
-      if (selectedPatientId) {
-          localStorage.setItem('vet_nexus_selected_patient_id', selectedPatientId);
-      } else {
-          localStorage.removeItem('vet_nexus_selected_patient_id');
-      }
-  }, [selectedPatientId]);
 
   const [appState, setAppState] = useState<AppState>({
     currentUser: null,
@@ -142,13 +121,12 @@ const App: React.FC = () => {
                     currentTenantId: data.tenant.id,
                     tenants: [data.tenant]
                 }));
-                // Check roles correctly as an array
                 if (!data.user.roles.includes('SuperAdmin')) {
                     await fetchAllData();
                 }
             }
         } catch (e) {
-            // Session expired, stay on login
+            // Session expired
         } finally {
             setIsLoading(false);
         }
@@ -172,7 +150,6 @@ const App: React.FC = () => {
       setIsLoading(true);
       try {
           const { data } = await AuthService.login({ email, password });
-          
           setAppState(prev => ({
               ...prev,
               currentUser: data.user,
@@ -181,7 +158,7 @@ const App: React.FC = () => {
           }));
           
           if (data.user.roles.includes('SuperAdmin')) {
-              // Admin logic handled by conditional render
+              // Admin logic
           } else {
               await fetchAllData();
           }
@@ -221,13 +198,8 @@ const App: React.FC = () => {
       setAppState(prev => ({ ...prev, currentUser: null, currentTenantId: '' }));
       setIsProfileOpen(false);
       setIsLoading(false);
-      
-      localStorage.removeItem('vet_nexus_current_view');
-      localStorage.removeItem('vet_nexus_selected_patient_id');
-      setCurrentView('dashboard');
   };
   
-  // -- HANDLERS --
   const handleAddPatient = async (petData: any) => withLoading(async () => {
       const { data } = await PatientService.create(petData);
       setAppState(prev => ({ ...prev, pets: [...prev.pets, data] }));
@@ -252,7 +224,6 @@ const App: React.FC = () => {
           }
           return { ...prev, sales: [data, ...prev.sales] };
       });
-
       if (sale.status === 'Paid') {
           const inv = await InventoryService.getAll();
           setAppState(prev => ({ ...prev, inventory: inv.data }));
@@ -260,15 +231,14 @@ const App: React.FC = () => {
   }, sale.status === 'Paid' ? 'Receipt generated & Stock updated' : 'Invoice generated successfully');
 
   const handleDeleteSale = async (id: string, reason: string) => withLoading(async () => {
-      // Reason unused in API call currently, but kept for future auditing
+      const sale = appState.sales.find(s => s.id === id);
+      if (!sale) return;
       await SaleService.delete(id);
-      
       const [updatedSales, updatedLogs, updatedInv] = await Promise.all([
           SaleService.getAll(),
           LogService.getAll(),
           InventoryService.getAll()
       ]);
-
       setAppState(prev => ({ 
           ...prev, 
           sales: updatedSales.data,
@@ -339,7 +309,6 @@ const App: React.FC = () => {
       }));
   }, 'Settings saved');
   
-  // Placeholders
   const handleUpdateTicket = () => {};
   const handleSwitchTenant = (id: string) => setAppState(prev => ({ ...prev, currentTenantId: id }));
   const handlePatientSelect = (id: string) => { setSelectedPatientId(id); setCurrentView('patients'); };
@@ -362,16 +331,19 @@ const App: React.FC = () => {
   const currency = currentTenant?.settings?.currency || 'USD';
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-100">
+    // UPDATED: Changed h-screen to h-[100dvh] for mobile browsers and removed w-screen to prevent x-scroll
+    <div className="flex h-[100dvh] w-full overflow-hidden bg-slate-100 font-sans">
       <DynamicIsland type={toast.type} message={toast.message} isVisible={toast.visible} onClose={hideToast} />
       <SpotlightSearch isOpen={isSpotlightOpen} onClose={() => setIsSpotlightOpen(false)} onNavigate={setCurrentView} />
       
       {isSaving && <LoadingScreen message="Saving changes..." />}
       
-      <main className="flex-1 flex flex-col relative transition-all duration-300 h-full w-full">
-        {/* HEADER */}
-        <header className="h-16 glass-panel flex items-center justify-between px-6 shrink-0 print:hidden z-30 relative mx-4 mt-4 rounded-2xl border border-white/60 shadow-sm">
-            <div className="flex items-center space-x-3">
+      {/* UPDATED: Main container handles the flex layout better */}
+      <main className="flex-1 flex flex-col relative transition-all duration-300 h-full w-full overflow-hidden">
+        
+        {/* HEADER: Updated padding/margins for mobile responsiveness */}
+        <header className="shrink-0 z-30 relative mx-2 mt-2 md:mx-4 md:mt-4 rounded-xl md:rounded-2xl border border-white/60 shadow-sm glass-panel flex items-center justify-between px-3 md:px-6 py-2 md:py-0 h-16">
+            <div className="flex items-center space-x-2 md:space-x-3">
                 {currentView !== 'dashboard' && (
                     <button 
                         onClick={() => setCurrentView('dashboard')} 
@@ -382,7 +354,7 @@ const App: React.FC = () => {
                     </button>
                 )}
                 
-                <h2 className="text-xl font-black text-slate-800 capitalize tracking-tight ml-2">
+                <h2 className="text-lg md:text-xl font-black text-slate-800 capitalize tracking-tight ml-1 md:ml-2 truncate max-w-[150px] md:max-w-none">
                     {selectedPatientId && currentView === 'patients' ? 'Patient Record' : currentView.replace('-', ' ')}
                 </h2>
             </div>
@@ -396,14 +368,22 @@ const App: React.FC = () => {
                 <span className="text-[10px] font-bold border border-slate-300 rounded px-1.5 py-0.5 bg-white shadow-sm">⌘K</span>
             </button>
 
-            <div className="flex items-center space-x-4">
+            {/* Mobile Search Icon */}
+            <button 
+                onClick={() => setIsSpotlightOpen(true)}
+                className="md:hidden p-2 text-slate-600 bg-white/50 rounded-lg"
+            >
+                <Search className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-2 md:space-x-4 ml-2">
                 <div className="text-right hidden md:block">
                     <p className="text-sm font-bold text-slate-800">{currentTenant?.name}</p>
                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{appState.currentUser.name}</p>
                 </div>
                 <div className="relative">
                     <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center space-x-2 focus:outline-none">
-                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md transition-transform hover:scale-105 ${getAvatarGradient(appState.currentUser.name)}`}>
+                         <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md transition-transform hover:scale-105 ${getAvatarGradient(appState.currentUser.name)}`}>
                             {appState.currentUser.avatarUrl ? <img src={appState.currentUser.avatarUrl} className="w-full h-full object-cover rounded-xl" /> : appState.currentUser.name.charAt(0)}
                         </div>
                     </button>
@@ -411,6 +391,9 @@ const App: React.FC = () => {
                         <>
                         <div className="fixed inset-0 z-10" onClick={() => setIsProfileOpen(false)}></div>
                         <div className="absolute right-0 mt-2 w-56 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 z-20 animate-scale-up overflow-hidden">
+                            <div className="p-4 border-b border-slate-100/50 block md:hidden">
+                                <p className="text-sm font-bold text-slate-800 truncate">{currentTenant?.name}</p>
+                            </div>
                             <div className="p-4 border-b border-slate-100/50">
                                 <p className="text-sm font-bold text-slate-800 truncate">{appState.currentUser.name}</p>
                                 <p className="text-xs text-slate-500 truncate">{appState.currentUser.email}</p>
@@ -426,26 +409,28 @@ const App: React.FC = () => {
             </div>
         </header>
         
-        <PageTransition view={currentView}>
-           {currentView === 'dashboard' && <Dashboard state={appState} onNavigate={setCurrentView} onSelectPatient={handlePatientSelect} />}
-           {currentView === 'patients' && !selectedPatientId && <PatientList pets={appState.pets} owners={appState.owners} onSelectPatient={handlePatientSelect} onAddPatient={handleAddPatient}/>}
-           {currentView === 'patients' && selectedPatientId && (
-                <PatientDetail pet={appState.pets.find(p => p.id === selectedPatientId)!} owner={appState.owners.find(o => o.id === appState.pets.find(p => p.id === selectedPatientId)?.ownerId)} onBack={() => setSelectedPatientId(null)} onAddNote={handleAddNote} />
-           )}
-           {/* FIXED: Removed extra props because Clients handles its own data now */}
-           {currentView === 'clients' && (
-                <Clients currency={currency} />
-            )}
-           {currentView === 'appointments' && <Appointments appointments={appState.appointments} pets={appState.pets} owners={appState.owners} onAddAppointment={handleAddAppointment} />}
-           {currentView === 'treatments' && <Treatments activePatients={appState.pets} appointments={appState.appointments} consultations={appState.consultations} owners={appState.owners} settings={currentTenant.settings} plan={currentTenant.plan} onSelectPatient={handlePatientSelect} onAddConsultation={handleAddConsultation} onAddLabRequest={handleAddLabRequest} onAddPatient={handleAddPatient} />}
-           {currentView === 'inventory' && <Inventory items={appState.inventory} currency={currency} onAddItem={handleAddInventory} onUpdateItem={handleUpdateInventory} />}
-           {currentView === 'pos' && <POS sales={appState.sales} owners={appState.owners} settings={currentTenant.settings} inventory={appState.inventory} plan={currentTenant.plan} onSaveSale={handleSaveSale} onDeleteSale={handleDeleteSale} />}
-           {currentView === 'lab' && <Lab results={appState.labResults} pets={appState.pets} owners={appState.owners} onAddResult={handleAddLabRequest} onUpdateResult={handleUpdateLabResult} />}
-           {currentView === 'reports' && <Reports sales={appState.sales} inventory={appState.inventory} pets={appState.pets} consultations={appState.consultations} currency={currency} />}
-           {currentView === 'logs' && <ClinicLogs logs={appState.logs} />}
-           {currentView === 'settings' && <Settings settings={currentTenant.settings} staff={appState.staff} plan={currentTenant.plan} currentUser={appState.currentUser!} tenants={appState.tenants} branches={appState.branches} onUpdateSettings={handleUpdateSettings} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onTransferStaff={handleTransferStaff} onUpdateProfile={handleUpdateProfile} onAddBranch={handleAddBranch} />}
-           {currentView === 'expenses' && <Expenses expenses={appState.expenses} settings={currentTenant.settings} onAddExpense={handleAddExpense} />}
-        </PageTransition>
+        {/* CONTENT AREA: Added overflow-y-auto to allow scrolling within the main area */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 md:p-4 pb-24 md:pb-4 scroll-smooth" id="main-scroll-container">
+            <PageTransition view={currentView}>
+                <div className="w-full max-w-full">
+                    {currentView === 'dashboard' && <Dashboard state={appState} onNavigate={setCurrentView} onSelectPatient={handlePatientSelect} />}
+                    {currentView === 'patients' && <PatientList pets={appState.pets} owners={appState.owners} onSelectPatient={handlePatientSelect} onAddPatient={handleAddPatient}/>}
+                    {currentView === 'patients' && selectedPatientId && (
+                            <PatientDetail pet={appState.pets.find(p => p.id === selectedPatientId)!} onBack={() => setSelectedPatientId(null)} onAddNote={handleAddNote} />
+                    )}
+                    {currentView === 'clients' && <Clients owners={appState.owners} pets={appState.pets} sales={appState.sales} onAddClient={handleAddClient} onAddPatient={handleAddPatient} />}
+                    {currentView === 'appointments' && <Appointments appointments={appState.appointments} pets={appState.pets} owners={appState.owners} onAddAppointment={handleAddAppointment} />}
+                    {currentView === 'treatments' && <Treatments activePatients={appState.pets} appointments={appState.appointments} consultations={appState.consultations} owners={appState.owners} settings={currentTenant.settings} plan={currentTenant.plan} onSelectPatient={handlePatientSelect} onAddConsultation={handleAddConsultation} onAddLabRequest={handleAddLabRequest} onAddPatient={handleAddPatient} />}
+                    {currentView === 'inventory' && <Inventory items={appState.inventory} currency={currency} onAddItem={handleAddInventory} onUpdateItem={handleUpdateInventory} />}
+                    {currentView === 'pos' && <POS sales={appState.sales} owners={appState.owners} settings={currentTenant.settings} inventory={appState.inventory} plan={currentTenant.plan} onSaveSale={handleSaveSale} onDeleteSale={handleDeleteSale} />}
+                    {currentView === 'lab' && <Lab results={appState.labResults} pets={appState.pets} owners={appState.owners} onAddResult={handleAddLabRequest} onUpdateResult={handleUpdateLabResult} />}
+                    {currentView === 'reports' && <Reports sales={appState.sales} inventory={appState.inventory} pets={appState.pets} consultations={appState.consultations} currency={currency} />}
+                    {currentView === 'logs' && <ClinicLogs logs={appState.logs} />}
+                    {currentView === 'settings' && <Settings settings={currentTenant.settings} staff={appState.staff} plan={currentTenant.plan} currentUser={appState.currentUser!} tenants={appState.tenants} branches={appState.branches} onUpdateSettings={handleUpdateSettings} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onTransferStaff={handleTransferStaff} onUpdateProfile={handleUpdateProfile} onAddBranch={handleAddBranch} />}
+                    {currentView === 'expenses' && <Expenses expenses={appState.expenses} settings={currentTenant.settings} onAddExpense={handleAddExpense} />}
+                </div>
+            </PageTransition>
+        </div>
         
         <AIAssistant plan={currentTenant?.plan} />
       </main>

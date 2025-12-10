@@ -120,4 +120,15 @@ export const SuperAdminService = {
   getStats: () => api.get('/admin/stats'),
 };
 
+// --- NEW CLIENT PORTAL SERVICE ---
+export const ClientPortalService = {
+  login: (credentials: any) => api.post('/portal/login', credentials),
+  getDashboard: () => api.get('/portal/dashboard'),
+  getPets: () => api.get('/portal/pets'),
+  bookAppointment: (data: any) => api.post('/portal/appointments', data),
+  getInvoices: () => api.get('/portal/invoices'),
+  getMessages: () => api.get('/portal/messages'),
+  sendMessage: (content: string) => api.post('/portal/messages', { content }),
+};
+
 export default api;

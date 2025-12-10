@@ -48,6 +48,8 @@ model Tenant {
   labResults    LabResult[]
   expenses      Expense[]
   logs          Log[]
+  messages      Message[]
+  clientUploads ClientUpload[]
 }
 
 model User {
@@ -94,6 +96,11 @@ model Owner {
   pets         Pet[]
   appointments Appointment[]
   consultations Consultation[]
+  
+  // NEW RELATIONS
+  sales         SaleRecord[]
+  messages      Message[]
+  uploads       ClientUpload[]
 }
 
 model Pet {
@@ -206,7 +213,6 @@ model InventoryItem {
   reorderLevel   Int       @default(5)
   expiryDate     String?
   
-  // ADDED FIELDS
   unit           String?   @default("pcs")
   location       String?
   batchNumber    String?
@@ -217,6 +223,11 @@ model SaleRecord {
   id            String   @id @default(uuid())
   tenantId      String
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  // Linked Owner (for Portal History)
+  ownerId       String?
+  owner         Owner?   @relation(fields: [ownerId], references: [id])
+
   clientId      String?
   clientName    String?
   clientAddress String?
@@ -248,4 +259,38 @@ model Expense {
   amount        Float
   paymentMethod String
   notes         String?
+}
+
+// NEW MODELS FOR CLIENT PORTAL
+
+model Message {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  // Context
+  ownerId   String
+  owner     Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  // Who sent it?
+  senderType String  // "Staff" or "Client"
+  senderId   String  // UserId or OwnerId (Client)
+  
+  content    String
+  isRead     Boolean @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model ClientUpload {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ownerId   String
+  owner     Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  fileName  String
+  fileUrl   String
+  fileType  String   // "Receipt", "Image", "Other"
+  uploadedAt DateTime @default(now())
+  notes     String?
 }

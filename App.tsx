@@ -18,8 +18,8 @@ import LoadingScreen from './components/LoadingScreen';
 import PageTransition from './components/PageTransition';
 import DynamicIsland, { ToastType } from './components/DynamicIsland';
 import SpotlightSearch from './components/SpotlightSearch';
-import MobileNavbar from './components/MobileNavbar'; // NEW IMPORT
-import InstallPrompt from './components/InstallPrompt'; // NEW IMPORT
+import MobileNavbar from './components/MobileNavbar'; 
+import InstallPrompt from './components/InstallPrompt'; 
 import { Auth } from './components/Auth';
 import { LogOut, User as UserIcon, Search, Home } from 'lucide-react';
 import { AuthService, PatientService, OwnerService, InventoryService, AppointmentService, SaleService, ConsultationService, LabService, ExpenseService, PlanService, UserService, BranchService, SettingsService, LogService } from './services/api';
@@ -207,6 +207,7 @@ const App: React.FC = () => {
       setAppState(prev => ({ ...prev, pets: [...prev.pets, data] }));
   }, 'Patient registered');
 
+  // NOTE: Clients component now handles its own addition, but we keep this for legacy references if needed
   const handleAddClient = async (clientData: any) => withLoading(async () => {
       const { data } = await OwnerService.create(clientData);
       setAppState(prev => ({ ...prev, owners: [...prev.owners, data] }));
@@ -409,7 +410,7 @@ const App: React.FC = () => {
             </div>
         </header>
         
-        {/* CONTENT AREA - Added bottom padding to account for mobile nav */}
+        {/* CONTENT AREA */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 md:p-4 pb-24 md:pb-4 scroll-smooth" id="main-scroll-container">
             <PageTransition view={currentView}>
                 <div className="w-full max-w-full">
@@ -418,7 +419,8 @@ const App: React.FC = () => {
                     {currentView === 'patients' && selectedPatientId && (
                             <PatientDetail pet={appState.pets.find(p => p.id === selectedPatientId)!} onBack={() => setSelectedPatientId(null)} onAddNote={handleAddNote} />
                     )}
-                    {currentView === 'clients' && <Clients owners={appState.owners} pets={appState.pets} sales={appState.sales} onAddClient={handleAddClient} onAddPatient={handleAddPatient} />}
+                    {/* FIXED: Clients component now processes its own data */}
+                    {currentView === 'clients' && <Clients currency={currency} />}
                     {currentView === 'appointments' && <Appointments appointments={appState.appointments} pets={appState.pets} owners={appState.owners} onAddAppointment={handleAddAppointment} />}
                     {currentView === 'treatments' && <Treatments activePatients={appState.pets} appointments={appState.appointments} consultations={appState.consultations} owners={appState.owners} settings={currentTenant.settings} plan={currentTenant.plan} onSelectPatient={handlePatientSelect} onAddConsultation={handleAddConsultation} onAddLabRequest={handleAddLabRequest} onAddPatient={handleAddPatient} />}
                     {currentView === 'inventory' && <Inventory items={appState.inventory} currency={currency} onAddItem={handleAddInventory} onUpdateItem={handleUpdateInventory} />}
@@ -432,7 +434,6 @@ const App: React.FC = () => {
             </PageTransition>
         </div>
         
-        {/* NEW: Mobile Bottom Navigation */}
         <MobileNavbar 
           currentView={currentView} 
           onNavigate={setCurrentView} 

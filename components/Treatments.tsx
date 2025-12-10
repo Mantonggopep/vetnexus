@@ -4,7 +4,7 @@ import {
   Stethoscope, Activity, FileText, Plus, Search, ChevronRight, 
   Brain, Sparkles, DollarSign, Calendar, 
   Thermometer, Heart, Wind, Weight,
-  Pill, Clock, Printer, Trash2, Eye, ChevronLeft, CreditCard, Banknote, Smartphone, AlertCircle
+  Pill, Clock, Printer, Trash2, Eye, ChevronLeft, CreditCard, Banknote, Smartphone, AlertCircle, User, ArrowLeft
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 import { suggestDiagnosis } from '../services/geminiService';
@@ -39,7 +39,7 @@ const safeArray = (data: any): any[] => {
     return [];
 };
 
-// --- SUB-COMPONENT: DETAIL VIEW (Fixed for React-To-Print v3+) ---
+// --- SUB-COMPONENT: DETAIL VIEW (Responsive) ---
 const TreatmentDetail: React.FC<{
     consult: Consultation;
     pet: Pet | undefined;
@@ -48,31 +48,28 @@ const TreatmentDetail: React.FC<{
     onBack: () => void;
 }> = ({ consult, pet, owner, settings, onBack }) => {
     const printRef = useRef<HTMLDivElement>(null);
-    
-    // UPDATED: Using 'contentRef' is required for newer versions of react-to-print
     const handlePrint = useReactToPrint({
         contentRef: printRef,
         documentTitle: `Medical_Receipt_${pet?.name || 'Patient'}_${new Date().toISOString().split('T')[0]}`,
     });
 
     return (
-        <div className="bg-slate-50 h-[calc(100vh-6rem)] flex flex-col rounded-3xl overflow-hidden relative border border-slate-200">
-             <div className="px-6 py-4 border-b border-slate-200 bg-white flex justify-between items-center sticky top-0 z-10 shadow-sm">
-                 <button onClick={onBack} className="text-slate-600 hover:text-slate-900 flex items-center text-sm font-bold transition-colors bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg">
-                     <ChevronLeft className="w-4 h-4 mr-1"/> Back to List
+        <div className="bg-slate-50 h-[calc(100dvh-5rem)] md:h-[calc(100vh-6rem)] flex flex-col md:rounded-3xl overflow-hidden relative border-t md:border border-slate-200">
+             <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-200 bg-white flex justify-between items-center sticky top-0 z-30 shadow-sm">
+                 <button onClick={onBack} className="text-slate-600 hover:text-slate-900 flex items-center text-xs md:text-sm font-bold transition-colors bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg">
+                     <ChevronLeft className="w-4 h-4 mr-1"/> Back
                  </button>
-                 <button onClick={() => handlePrint()} className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl text-sm font-bold flex items-center shadow-lg transition-all active:scale-95">
-                     <Printer className="w-4 h-4 mr-2"/> Print Receipt & Record
+                 <button onClick={() => handlePrint()} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center shadow-lg transition-all active:scale-95">
+                     <Printer className="w-4 h-4 mr-2"/> Print Record
                  </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-200/50">
-                <div className="bg-white w-full max-w-3xl rounded-none shadow-2xl p-12 min-h-[1000px]">
+            <div className="flex-1 overflow-y-auto p-2 md:p-8 flex justify-center bg-slate-100">
+                <div className="bg-white w-full max-w-3xl rounded-xl shadow-lg p-4 md:p-12 h-fit">
                     <PrintableContent pet={pet || null} owner={owner || null} consult={consult} settings={settings} />
                 </div>
             </div>
 
-            {/* Hidden Print Container - Attached to printRef */}
             <div style={{ display: 'none' }}>
                 <div ref={printRef} className="print-container p-8">
                      <PrintableContent pet={pet || null} owner={owner || null} consult={consult} settings={settings} isPrint={true} />
@@ -310,80 +307,62 @@ const Treatments: React.FC<TreatmentsProps> = ({ activePatients, appointments, c
 
   // --- RENDER ---
 
-  // 1. DETAIL VIEW (Delegated)
   if (view === 'detail' && selectedConsultation) {
       const pet = activePatients.find(p => p.id === selectedConsultation!.petId);
       const owner = owners.find(o => o.id === selectedConsultation!.ownerId);
-      
-      return (
-          <TreatmentDetail 
-              consult={selectedConsultation} 
-              pet={pet} 
-              owner={owner} 
-              settings={settings} 
-              onBack={() => setView('list')} 
-          />
-      );
+      return <TreatmentDetail consult={selectedConsultation} pet={pet} owner={owner} settings={settings} onBack={() => setView('list')} />;
   }
 
-  // 2. LIST VIEW
+  // LIST VIEW (Mobile Optimized)
   if (view === 'list') {
       return (
-          <div className="bg-slate-50 rounded-3xl h-[calc(100vh-6rem)] flex flex-col font-sans overflow-hidden border border-slate-200 shadow-xl">
-              <div className="px-6 py-5 border-b border-slate-200 flex justify-between items-center bg-white sticky top-0 z-10">
+          <div className="bg-white md:bg-slate-50 md:rounded-3xl h-[calc(100dvh-5rem)] md:h-[calc(100vh-6rem)] flex flex-col font-sans overflow-hidden border border-slate-200 shadow-xl">
+              <div className="px-4 py-3 md:px-6 md:py-5 border-b border-slate-200 bg-white sticky top-0 z-20 flex justify-between items-center shrink-0">
                   <div className="flex flex-col">
-                    <h2 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center">
-                        <Stethoscope className="w-6 h-6 mr-2 text-blue-600" /> 
-                        Treatment & Records
+                    <h2 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight flex items-center">
+                        <Stethoscope className="w-5 h-5 md:w-6 md:h-6 mr-2 text-blue-600" /> 
+                        Records
                     </h2>
-                    <p className="text-xs text-slate-500 font-medium ml-8 mt-0.5">Manage consultations, billing & receipts</p>
+                    <p className="text-xs text-slate-500 font-medium hidden md:block mt-0.5">Manage consultations & billing</p>
                   </div>
                   <button 
                     onClick={() => { resetForm(); setView('new'); }} 
-                    className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-95 transition-all"
+                    className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold flex items-center shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-95 transition-all"
                   >
-                      <Plus className="w-4 h-4 mr-2" /> Start New Consultation
+                      <Plus className="w-4 h-4 mr-1 md:mr-2" /> <span className="hidden md:inline">Start New Consultation</span> <span className="md:hidden">New</span>
                   </button>
               </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-slate-100/50">
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-2 md:p-4 bg-slate-50 md:bg-slate-100/50 pb-20 md:pb-0">
                   <div className="grid grid-cols-1 gap-3">
                       {consultations.map(consult => {
                           const pet = activePatients.find(p => p.id === consult.petId);
                           return (
-                              <div key={consult.id} onClick={() => handleViewDetail(consult)} className="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-400 transition-all duration-300 flex items-center justify-between cursor-pointer">
-                                  <div className="flex items-center space-x-5">
-                                      <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-lg border-2 border-slate-200 group-hover:border-blue-500 group-hover:text-blue-600 transition-colors">
+                              <div key={consult.id} onClick={() => handleViewDetail(consult)} className="group bg-white p-4 rounded-xl border border-slate-200 shadow-sm active:scale-[0.99] transition-all duration-300 flex items-center justify-between cursor-pointer">
+                                  <div className="flex items-center space-x-3 md:space-x-5">
+                                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-base md:text-lg border-2 border-slate-200 group-hover:border-blue-500 group-hover:text-blue-600 transition-colors shrink-0">
                                           {pet?.name.charAt(0)}
                                       </div>
                                       <div>
-                                          <h3 className="font-bold text-slate-800 text-base group-hover:text-blue-700 transition-colors">{pet?.name || 'Unknown'}</h3>
-                                          <div className="flex items-center text-xs text-slate-500 mt-1 space-x-3">
+                                          <h3 className="font-bold text-slate-800 text-sm md:text-base group-hover:text-blue-700 transition-colors">{pet?.name || 'Unknown'}</h3>
+                                          <div className="flex items-center text-xs text-slate-500 mt-1 space-x-2 md:space-x-3">
                                               <span className="flex items-center"><Calendar className="w-3 h-3 mr-1" />{new Date(consult.date).toLocaleDateString()}</span>
                                               <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                                              <span>{consult.vetName}</span>
+                                              <span className="truncate max-w-[80px] md:max-w-none">{consult.vetName}</span>
                                           </div>
                                       </div>
                                   </div>
-                                  <div className="flex-1 mx-8 hidden md:block">
-                                      <div className="flex flex-col">
-                                          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Diagnosis</span>
-                                          <p className="text-sm font-semibold text-slate-700 truncate max-w-md">
-                                            {consult.diagnosis.tentative || 'No Diagnosis Recorded'}
-                                          </p>
-                                      </div>
-                                  </div>
-                                  <div className="flex items-center space-x-6">
+                                  <div className="flex items-center space-x-2 md:space-x-6">
                                       {consult.financials && (
-                                          <div className="text-right hidden sm:block">
-                                              <p className={`text-sm font-bold ${consult.financials.paymentStatus === 'Paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                          <div className="text-right block">
+                                              <p className={`text-xs md:text-sm font-bold ${consult.financials.paymentStatus === 'Paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
                                                   {consult.financials.paymentStatus}
                                               </p>
-                                              <p className="text-xs text-slate-400 font-mono">
+                                              <p className="text-[10px] md:text-xs text-slate-400 font-mono">
                                                   {formatCurrency(consult.financials.total, settings.currency)}
                                               </p>
                                           </div>
                                       )}
-                                      <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                                      <ChevronRight className="w-4 h-4 md:w-5 md:h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
                                   </div>
                               </div>
                           );
@@ -394,16 +373,28 @@ const Treatments: React.FC<TreatmentsProps> = ({ activePatients, appointments, c
       );
   }
 
-  // 3. NEW CONSULTATION VIEW
+  // 3. NEW CONSULTATION VIEW (Fully Responsive)
   return (
-      <div className="flex h-[calc(100vh-6rem)] gap-4 bg-[#F1F5F9] rounded-3xl overflow-hidden p-2 font-sans">
-          {/* Left Panel: Sidebar */}
-          <div className="w-80 flex flex-col space-y-4 h-full">
-              <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 h-full flex flex-col">
-                  <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4 flex items-center">
-                      <Search className="w-3 h-3 mr-2"/> Patient Selection
+      <div className="flex flex-col md:flex-row h-[calc(100dvh-5rem)] md:h-[calc(100vh-6rem)] gap-4 bg-[#F1F5F9] md:rounded-3xl overflow-hidden md:p-2 font-sans">
+          
+          {/* MOBILE: HEADER NAV */}
+          <div className="md:hidden bg-white p-3 border-b border-slate-200 flex justify-between items-center sticky top-0 z-40 shrink-0">
+               <button onClick={() => setView('list')} className="p-2 bg-slate-100 rounded-lg text-slate-600">
+                  <ArrowLeft className="w-5 h-5" />
+               </button>
+               <h3 className="font-bold text-slate-800">New Consultation</h3>
+               <button onClick={() => handleCreateConsultation('Finalized')} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-md">
+                   Save
+               </button>
+          </div>
+
+          {/* SIDEBAR (Stacked on Mobile) */}
+          <div className="w-full md:w-80 flex flex-col space-y-4 shrink-0">
+              <div className="bg-white p-4 md:p-5 rounded-none md:rounded-3xl shadow-sm border-b md:border border-slate-200 flex flex-col">
+                  <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-3 md:mb-4 flex items-center">
+                      <User className="w-3 h-3 mr-2"/> Patient Selection
                   </h3>
-                  <div className="space-y-4">
+                  <div className="space-y-3 md:space-y-4">
                       <SearchableSelect 
                           label="Client"
                           options={ownerOptions}
@@ -420,7 +411,7 @@ const Treatments: React.FC<TreatmentsProps> = ({ activePatients, appointments, c
                                   onChange={(val) => setSelectedPet(activePatients.find(p => p.id === val) || null)}
                                   placeholder="Select Patient..."
                               />
-                              <button onClick={() => setIsAddPatientModalOpen(true)} className="mt-3 w-full py-2 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl flex items-center justify-center transition-colors">
+                              <button onClick={() => setIsAddPatientModalOpen(true)} className="mt-3 w-full py-2.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl flex items-center justify-center transition-colors">
                                   <Plus className="w-3 h-3 mr-1"/> New Patient
                               </button>
                           </div>
@@ -428,24 +419,19 @@ const Treatments: React.FC<TreatmentsProps> = ({ activePatients, appointments, c
                   </div>
 
                   {selectedPet && (
-                      <div className="mt-8 flex-1 flex flex-col animate-[fadeIn_0.5s_ease-out]">
-                          <div className="bg-slate-900 rounded-2xl p-4 text-white shadow-lg mb-6 relative overflow-hidden">
+                      <div className="mt-4 md:mt-8 flex-1 flex flex-col animate-[fadeIn_0.5s_ease-out]">
+                          <div className="bg-slate-900 rounded-2xl p-4 text-white shadow-lg mb-4 md:mb-6 relative overflow-hidden">
                               <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500 rounded-full blur-2xl opacity-20 -translate-y-10 translate-x-10"></div>
                               <div className="flex items-center space-x-3 relative z-10">
-                                  <img src={selectedPet.imageUrl || `https://ui-avatars.com/api/?name=${selectedPet.name}`} className="w-14 h-14 rounded-full bg-slate-800 border-2 border-slate-700 object-cover" />
+                                  <img src={selectedPet.imageUrl || `https://ui-avatars.com/api/?name=${selectedPet.name}`} className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-800 border-2 border-slate-700 object-cover" />
                                   <div>
-                                      <h3 className="font-bold text-lg leading-tight">{selectedPet.name}</h3>
-                                      <p className="text-slate-400 text-xs font-medium">{selectedPet.species} • {selectedPet.breed}</p>
+                                      <h3 className="font-bold text-base md:text-lg leading-tight">{selectedPet.name}</h3>
+                                      <p className="text-slate-400 text-[10px] md:text-xs font-medium">{selectedPet.species} • {selectedPet.breed}</p>
                                   </div>
-                              </div>
-                              <div className="mt-4 flex justify-between items-center text-xs font-semibold bg-white/5 rounded-lg p-2 backdrop-blur-sm relative z-10 border border-white/10">
-                                  <span>{selectedPet.age} Years</span>
-                                  <span className="w-1 h-1 bg-slate-500 rounded-full"></span>
-                                  <span>{selectedPet.gender}</span>
                               </div>
                           </div>
                           
-                          <div className="flex-1 overflow-y-auto custom-scrollbar">
+                          <div className="hidden md:block flex-1 overflow-y-auto custom-scrollbar">
                               <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-3">Last Visit</h4>
                               {previousConsultation ? (
                                   <div className="relative pl-4 border-l-2 border-slate-200 space-y-6">
@@ -466,17 +452,17 @@ const Treatments: React.FC<TreatmentsProps> = ({ activePatients, appointments, c
                                           </div>
                                       </div>
                                   </div>
-                              ) : <p className="text-xs text-slate-400 italic text-center mt-10 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">No previous history found for this patient.</p>}
+                              ) : <p className="text-xs text-slate-400 italic text-center mt-10 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">No previous history found.</p>}
                           </div>
                       </div>
                   )}
               </div>
           </div>
 
-          {/* Right Panel: Form */}
-          <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
-              {/* Header */}
-              <div className="px-8 py-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-20">
+          {/* MAIN FORM AREA */}
+          <div className="flex-1 bg-white md:rounded-3xl shadow-sm border-x border-b md:border border-slate-200 flex flex-col overflow-hidden">
+              {/* Desktop Header (Hidden on Mobile) */}
+              <div className="hidden md:flex px-8 py-4 border-b border-slate-100 justify-between items-center bg-white sticky top-0 z-20">
                   <div className="flex items-center">
                       <button onClick={() => setView('list')} className="mr-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-all">
                           <ChevronLeft className="w-5 h-5" />
@@ -484,299 +470,162 @@ const Treatments: React.FC<TreatmentsProps> = ({ activePatients, appointments, c
                       <h2 className="text-xl font-bold text-slate-900">New Consultation</h2>
                   </div>
                   <div className="flex space-x-3">
-                      <button onClick={() => handleCreateConsultation('Draft')} className="px-5 py-2 text-slate-600 hover:bg-slate-50 rounded-xl font-bold border border-slate-300 text-sm transition-all">Save Draft</button>
+                      <button onClick={() => handleCreateConsultation('Draft')} className="px-5 py-2 text-slate-600 hover:bg-slate-50 rounded-xl font-bold border border-slate-300 text-sm transition-all">Draft</button>
                       <button onClick={() => handleCreateConsultation('Finalized')} className="px-5 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-bold shadow-lg shadow-blue-600/20 text-sm transform active:scale-95 transition-all">
-                         Save & Finalize
+                         Finalize
                       </button>
                   </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-8 bg-slate-50/50">
-                  {/* SECTION 1: VITALS */}
-                  <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                      <h3 className="text-xs font-extrabold text-cyan-700 uppercase tracking-widest mb-5 flex items-center border-b border-cyan-100 pb-2">
+              {/* SCROLLABLE FORM CONTENT */}
+              <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar space-y-6 md:space-y-8 bg-slate-50/50 pb-24 md:pb-8">
+                  
+                  {/* 1. VITALS */}
+                  <section className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200">
+                      <h3 className="text-xs font-extrabold text-cyan-700 uppercase tracking-widest mb-4 flex items-center">
                           <Activity className="w-4 h-4 mr-2"/> Clinical Vitals
                       </h3>
-                      <div className="grid grid-cols-4 gap-6">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
                           {[
                               { key: 'weightKg', label: 'Weight', unit: 'kg', icon: Weight },
                               { key: 'temperatureC', label: 'Temp', unit: '°C', icon: Thermometer },
                               { key: 'heartRateBpm', label: 'Heart Rate', unit: 'bpm', icon: Heart },
                               { key: 'respiratoryRate', label: 'Resp. Rate', unit: 'rpm', icon: Wind }
                           ].map((item) => (
-                              <div key={item.key} className="relative group">
-                                  <div className="relative p-4 flex flex-col items-center bg-cyan-50/50 rounded-xl border border-cyan-100 group-hover:border-cyan-300 transition-all">
-                                      <div className="bg-white p-2 rounded-full shadow-sm text-cyan-600 mb-2">
-                                          <item.icon className="w-4 h-4" />
-                                      </div>
-                                      <label className="text-[10px] font-bold text-cyan-900 uppercase tracking-wider mb-1">{item.label}</label>
-                                      <div className="relative w-full">
-                                          <input 
-                                              type="number" 
-                                              className="w-full bg-white border border-cyan-200 rounded-lg text-center py-1 text-lg font-bold text-slate-800 focus:ring-2 focus:ring-cyan-500 focus:outline-none transition-shadow placeholder:text-slate-300"
-                                              placeholder="0"
-                                              value={(formData as any)[item.key]}
-                                              onChange={e => setFormData({...formData, [item.key]: e.target.value})}
-                                          />
-                                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none">{item.unit}</span>
-                                      </div>
+                              <div key={item.key} className="relative p-3 md:p-4 flex flex-col items-center bg-cyan-50/50 rounded-xl border border-cyan-100">
+                                  <label className="text-[10px] font-bold text-cyan-900 uppercase tracking-wider mb-1">{item.label}</label>
+                                  <div className="relative w-full">
+                                      <input 
+                                          type="number" 
+                                          className="w-full bg-white border border-cyan-200 rounded-lg text-center py-2 text-base md:text-lg font-bold text-slate-800 focus:ring-2 focus:ring-cyan-500 focus:outline-none transition-shadow placeholder:text-slate-300"
+                                          placeholder="0"
+                                          value={(formData as any)[item.key]}
+                                          onChange={e => setFormData({...formData, [item.key]: e.target.value})}
+                                      />
+                                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none">{item.unit}</span>
                                   </div>
                               </div>
                           ))}
                       </div>
                   </section>
 
-                  {/* SECTION 2: EXAM */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                      <div className="lg:col-span-5 space-y-6">
-                           <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 h-full">
-                                <h3 className="text-xs font-extrabold text-indigo-700 uppercase tracking-widest mb-5 flex items-center border-b border-indigo-100 pb-2">
-                                    <FileText className="w-4 h-4 mr-2"/> Subjective & History
-                                </h3>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1 ml-1">Chief Complaint</label>
-                                        <textarea 
-                                            className="w-full p-3 bg-indigo-50/30 border border-indigo-100 rounded-xl text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none resize-none" 
-                                            rows={2}
-                                            placeholder="Reason for visit..." 
-                                            value={formData.chiefComplaint} 
-                                            onChange={e => setFormData({...formData, chiefComplaint: e.target.value})} 
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1 ml-1">Detailed History</label>
-                                        <textarea 
-                                            className="w-full p-3 bg-indigo-50/30 border border-indigo-100 rounded-xl text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none resize-none" 
-                                            rows={6}
-                                            placeholder="Patient history..." 
-                                            value={formData.history} 
-                                            onChange={e => setFormData({...formData, history: e.target.value})} 
-                                        />
-                                    </div>
-                                </div>
-                           </section>
-                      </div>
+                  {/* 2. HISTORY */}
+                  <section className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200">
+                        <h3 className="text-xs font-extrabold text-indigo-700 uppercase tracking-widest mb-4 flex items-center">
+                            <FileText className="w-4 h-4 mr-2"/> History & Exam
+                        </h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1 ml-1">Chief Complaint</label>
+                                <textarea 
+                                    className="w-full p-3 bg-indigo-50/30 border border-indigo-100 rounded-xl text-sm font-medium text-slate-800 outline-none" 
+                                    rows={2}
+                                    placeholder="Reason for visit..." 
+                                    value={formData.chiefComplaint} 
+                                    onChange={e => setFormData({...formData, chiefComplaint: e.target.value})} 
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1 ml-1">Detailed History</label>
+                                <textarea 
+                                    className="w-full p-3 bg-indigo-50/30 border border-indigo-100 rounded-xl text-sm font-medium text-slate-800 outline-none" 
+                                    rows={4}
+                                    placeholder="Patient history..." 
+                                    value={formData.history} 
+                                    onChange={e => setFormData({...formData, history: e.target.value})} 
+                                />
+                            </div>
+                        </div>
+                  </section>
 
-                      <div className="lg:col-span-7">
-                          <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                              <h3 className="text-xs font-extrabold text-indigo-700 uppercase tracking-widest mb-5 flex items-center border-b border-indigo-100 pb-2">
-                                  <Stethoscope className="w-4 h-4 mr-2"/> Objective Exam
-                              </h3>
-                              <div className="grid grid-cols-2 gap-3">
-                                  {Object.keys(formData.exam).map((system) => (
-                                      <div key={system} className="group">
-                                          <div className="flex items-center justify-between mb-1 px-1">
-                                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{system}</label>
-                                              <div className={`w-2 h-2 rounded-full ${(formData.exam as any)[system] ? 'bg-indigo-500' : 'bg-slate-200'}`}></div>
-                                          </div>
-                                          <input 
-                                              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none placeholder:text-slate-300"
-                                              placeholder="Normal"
-                                              value={(formData.exam as any)[system]}
-                                              onChange={e => setFormData({...formData, exam: { ...formData.exam, [system]: e.target.value }})}
-                                          />
-                                      </div>
-                                  ))}
-                              </div>
-                          </section>
-                      </div>
-                  </div>
-
-                  {/* SECTION 3: DIAGNOSIS */}
-                  <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-purple-50 rounded-full blur-3xl -translate-y-16 translate-x-10 pointer-events-none"></div>
+                  {/* 3. DIAGNOSIS (AI) */}
+                  <section className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200 relative overflow-hidden">
                       <div className="flex justify-between items-center mb-5 border-b border-purple-100 pb-2">
                           <h3 className="text-xs font-extrabold text-purple-700 uppercase tracking-widest flex items-center">
-                              <Brain className="w-4 h-4 mr-2"/> Assessment & Plan
+                              <Brain className="w-4 h-4 mr-2"/> Diagnosis
                           </h3>
                           <button 
                               onClick={handleAiDiagnose} 
                               disabled={isAiLoading || !formData.chiefComplaint}
-                              className="group relative px-4 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold shadow-md shadow-purple-200 hover:bg-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden active:scale-95"
+                              className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold shadow-md active:scale-95 disabled:opacity-50"
                           >
-                              <span className="relative z-10 flex items-center">
-                                  {isAiLoading ? 'Thinking...' : <><Sparkles className="w-3 h-3 mr-1.5 group-hover:animate-spin"/> AI Diagnosis</>}
-                              </span>
+                              {isAiLoading ? 'Thinking...' : 'AI Suggest'}
                           </button>
                       </div>
                       <div className="space-y-4 relative z-10">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
-                                  <label className="text-[10px] uppercase font-bold text-slate-400 ml-1 mb-1 block">Tentative Diagnosis</label>
+                                  <label className="text-[10px] uppercase font-bold text-slate-400 ml-1 mb-1 block">Tentative</label>
                                   <input 
                                     type="text" 
-                                    className="w-full p-3 bg-purple-50/20 border border-purple-200 rounded-xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none" 
-                                    placeholder="e.g. Parvovirus Enteritis" 
+                                    className="w-full p-3 bg-purple-50/20 border border-purple-200 rounded-xl text-sm font-bold text-slate-800 outline-none" 
+                                    placeholder="e.g. Parvovirus" 
                                     value={formData.diagnosis.tentative} 
                                     onChange={e => setFormData({...formData, diagnosis: { ...formData.diagnosis, tentative: e.target.value }})} 
                                   />
                               </div>
                               <div>
-                                  <label className="text-[10px] uppercase font-bold text-slate-400 ml-1 mb-1 block">Differentials</label>
-                                  <input 
-                                    type="text" 
-                                    className="w-full p-3 bg-purple-50/20 border border-purple-200 rounded-xl text-sm font-medium text-slate-600 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none" 
-                                    placeholder="e.g. Parasitic gastroenteritis, Dietary indiscretion" 
-                                    value={formData.diagnosis.differentials} 
-                                    onChange={e => setFormData({...formData, diagnosis: { ...formData.diagnosis, differentials: e.target.value }})} 
+                                  <label className="text-[10px] uppercase font-bold text-slate-400 ml-1 mb-1 block">Treatment Plan</label>
+                                  <textarea 
+                                      className="w-full p-3 bg-purple-50/20 border border-purple-200 rounded-xl text-sm font-medium text-slate-800 h-24 outline-none resize-none" 
+                                      placeholder="Treatment steps..." 
+                                      value={formData.plan} 
+                                      onChange={e => setFormData({...formData, plan: e.target.value})} 
                                   />
                               </div>
-                          </div>
-                          <div>
-                                <label className="text-[10px] uppercase font-bold text-slate-400 ml-1 mb-1 block">Treatment Plan</label>
-                                <textarea 
-                                    className="w-full p-4 bg-purple-50/20 border border-purple-200 rounded-xl text-sm font-medium text-slate-800 h-28 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none resize-none leading-relaxed" 
-                                    placeholder="Describe the treatment plan, fluid therapy, monitoring..." 
-                                    value={formData.plan} 
-                                    onChange={e => setFormData({...formData, plan: e.target.value})} 
-                                />
                           </div>
                       </div>
                   </section>
 
-                  {/* SECTION 4: FINANCIALS */}
-                  <section className="bg-white rounded-2xl p-6 shadow-md shadow-slate-200/50 border border-emerald-100">
-                      <h3 className="text-xs font-extrabold text-emerald-700 uppercase tracking-widest mb-5 flex items-center border-b border-emerald-100 pb-2">
-                          <DollarSign className="w-4 h-4 mr-2"/> Financials & Payment
+                  {/* 4. FINANCIALS */}
+                  <section className="bg-white rounded-2xl p-4 md:p-6 shadow-md shadow-slate-200/50 border border-emerald-100">
+                      <h3 className="text-xs font-extrabold text-emerald-700 uppercase tracking-widest mb-5 flex items-center">
+                          <DollarSign className="w-4 h-4 mr-2"/> Billing
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           <div className="space-y-4">
                               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Service Fee</label>
-                                  <div className="relative">
-                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">{getCurrencySymbol(settings.currency)}</span>
-                                      <input 
-                                        type="number" 
-                                        className="w-full pl-8 p-2 bg-white border border-slate-300 rounded-lg text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none" 
-                                        value={formData.serviceFee} 
-                                        onChange={e => setFormData({...formData, serviceFee: e.target.value})} 
-                                        placeholder="0.00"
-                                      />
-                                  </div>
+                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Fee</label>
+                                  <input type="number" className="w-full p-2 bg-white border border-slate-300 rounded-lg text-sm font-bold" value={formData.serviceFee} onChange={e => setFormData({...formData, serviceFee: e.target.value})} placeholder="0.00"/>
                               </div>
                               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
                                   <label className="block text-[10px] font-bold text-rose-500 uppercase mb-1">Discount</label>
-                                  <div className="relative">
-                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-400 text-sm font-bold">{getCurrencySymbol(settings.currency)}</span>
-                                      <input 
-                                        type="number" 
-                                        className="w-full pl-8 p-2 bg-white border border-rose-200 rounded-lg text-sm font-bold text-rose-600 focus:ring-2 focus:ring-rose-500 focus:outline-none" 
-                                        value={formData.discount} 
-                                        onChange={e => setFormData({...formData, discount: e.target.value})} 
-                                        placeholder="0.00"
-                                      />
-                                  </div>
+                                  <input type="number" className="w-full p-2 bg-white border border-rose-200 rounded-lg text-sm font-bold text-rose-600" value={formData.discount} onChange={e => setFormData({...formData, discount: e.target.value})} placeholder="0.00"/>
                               </div>
                           </div>
 
-                          <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 flex flex-col justify-between">
-                              <div>
-                                  <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-2">Payment Method</label>
-                                  <div className="grid grid-cols-2 gap-2 mb-4">
-                                      {['Cash', 'Card', 'Bank Transfer', 'Part Payment', 'Not Paid'].map((method) => (
-                                          <button 
-                                            key={method} 
-                                            onClick={() => setFormData({...formData, paymentMethod: method as any})}
-                                            className={`text-xs py-2 px-1 rounded-lg font-bold border transition-all ${formData.paymentMethod === method ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-500 border-emerald-200 hover:border-emerald-400'}`}
-                                          >
-                                              {method}
-                                          </button>
-                                      ))}
-                                  </div>
-                              </div>
-                              
-                              <div>
-                                <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-1">Amount Paying Now</label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 text-sm font-bold">{getCurrencySymbol(settings.currency)}</span>
-                                    <input 
-                                        type="number" 
-                                        className="w-full pl-8 p-2 bg-white border border-emerald-300 rounded-lg text-lg font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none" 
-                                        value={formData.amountPaid} 
-                                        onChange={e => setFormData({...formData, amountPaid: e.target.value})} 
-                                        placeholder="0.00"
-                                    />
-                                </div>
-                              </div>
-                          </div>
-
-                          <div className="bg-slate-900 p-6 rounded-xl flex flex-col justify-center items-end shadow-xl text-right relative overflow-hidden">
-                              <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-500 rounded-full blur-3xl -translate-x-10 -translate-y-10 opacity-20"></div>
-                              
-                              <div className="relative z-10 w-full">
-                                  <div className="flex justify-between text-slate-400 text-xs mb-1">
-                                      <span>Total Bill:</span>
-                                      <span>{formatCurrency(currentTotal, settings.currency)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-slate-400 text-xs mb-4 pb-4 border-b border-slate-700">
-                                      <span>Paid Now:</span>
-                                      <span>{formatCurrency(currentAmountPaid, settings.currency)}</span>
-                                  </div>
-                                  
-                                  <span className="text-[10px] text-emerald-400 uppercase font-bold tracking-widest block mb-1">Balance Due</span>
-                                  <span className="text-3xl font-mono font-bold text-white block">
-                                      {formatCurrency(currentBalance, settings.currency)}
-                                  </span>
-                              </div>
+                          <div className="bg-slate-900 p-6 rounded-xl flex flex-col justify-center items-end shadow-xl text-right">
+                              <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Balance Due</p>
+                              <span className="text-3xl font-mono font-bold text-white block">
+                                  {formatCurrency(currentBalance, settings.currency)}
+                              </span>
                           </div>
                       </div>
                   </section>
                   
-                  {/* SECTION 5: PRESCRIPTION & REMINDERS (Grid) */}
+                  {/* 5. PRESCRIPTION & REMINDERS (Stacked on Mobile) */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* PRESCRIPTION */}
-                      <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                          <h3 className="text-xs font-extrabold text-rose-600 uppercase tracking-widest mb-5 flex items-center border-b border-rose-100 pb-2">
+                      <section className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200">
+                          <h3 className="text-xs font-extrabold text-rose-600 uppercase tracking-widest mb-4 flex items-center">
                               <Pill className="w-4 h-4 mr-2"/> Prescription
                           </h3>
                           <div className="bg-rose-50 p-3 rounded-xl border border-rose-100 mb-4 space-y-2">
                               <input type="text" placeholder="Drug Name" className="w-full p-2 text-xs border rounded-lg" value={newRx.name} onChange={e => setNewRx({...newRx, name: e.target.value})} />
                               <div className="flex space-x-2">
-                                  <input type="text" placeholder="Dosage" className="w-1/3 p-2 text-xs border rounded-lg" value={newRx.dosage} onChange={e => setNewRx({...newRx, dosage: e.target.value})} />
+                                  <input type="text" placeholder="Dose" className="w-1/3 p-2 text-xs border rounded-lg" value={newRx.dosage} onChange={e => setNewRx({...newRx, dosage: e.target.value})} />
                                   <input type="text" placeholder="Freq" className="w-1/3 p-2 text-xs border rounded-lg" value={newRx.frequency} onChange={e => setNewRx({...newRx, frequency: e.target.value})} />
                                   <input type="text" placeholder="Dur." className="w-1/3 p-2 text-xs border rounded-lg" value={newRx.duration} onChange={e => setNewRx({...newRx, duration: e.target.value})} />
                               </div>
-                              <button onClick={handleAddPrescription} className="w-full py-2 bg-rose-500 text-white rounded-lg text-xs font-bold hover:bg-rose-600 transition-colors shadow-sm">Add Medication</button>
+                              <button onClick={handleAddPrescription} className="w-full py-2 bg-rose-500 text-white rounded-lg text-xs font-bold hover:bg-rose-600 transition-colors shadow-sm">Add</button>
                           </div>
                           <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-                              {(prescriptions || []).map((rx) => (
+                              {prescriptions.map((rx) => (
                                   <div key={rx.id} className="flex justify-between items-center p-2 bg-white border border-slate-100 rounded-lg shadow-sm text-xs">
-                                      <span className="font-bold text-slate-700">{rx.name} <span className="font-normal text-slate-500">({rx.dosage})</span></span>
-                                      <button onClick={() => removePrescription(rx.id)} className="text-rose-400 hover:text-rose-600"><Trash2 className="w-3 h-3"/></button>
+                                      <span className="font-bold text-slate-700">{rx.name}</span>
+                                      <button onClick={() => removePrescription(rx.id)} className="text-rose-400"><Trash2 className="w-3 h-3"/></button>
                                   </div>
                               ))}
-                              {prescriptions.length === 0 && <p className="text-xs text-slate-400 italic text-center py-2">No medications added.</p>}
                           </div>
-                      </section>
-
-                      {/* REMINDERS */}
-                      <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                           <h3 className="text-xs font-extrabold text-amber-600 uppercase tracking-widest mb-5 flex items-center border-b border-amber-100 pb-2">
-                               <Clock className="w-4 h-4 mr-2"/> Follow-up
-                           </h3>
-                           <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100">
-                               <div className="flex items-center space-x-2 mb-4">
-                                   <input type="checkbox" checked={createReminder} onChange={e => setCreateReminder(e.target.checked)} className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500" />
-                                   <label className="text-sm font-bold text-amber-900">Schedule Reminder</label>
-                               </div>
-                               {createReminder && (
-                                   <div className="space-y-3 animate-[fadeIn_0.3s]">
-                                       <div>
-                                           <label className="block text-[10px] font-bold text-amber-800 uppercase mb-1">Type</label>
-                                           <select className="w-full p-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-amber-900" value={reminderType} onChange={(e:any) => setReminderType(e.target.value)}>
-                                               <option value="Vaccination">Vaccination (Next Year)</option>
-                                               <option value="Follow-up">Medical Check-up</option>
-                                               <option value="Deworming">Deworming</option>
-                                           </select>
-                                       </div>
-                                       <div>
-                                           <label className="block text-[10px] font-bold text-amber-800 uppercase mb-1">Days from now</label>
-                                           <input type="number" className="w-full p-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold" value={reminderDuration} onChange={e => setReminderDuration(Number(e.target.value))} />
-                                       </div>
-                                   </div>
-                               )}
-                           </div>
                       </section>
                   </div>
               </div>
@@ -791,7 +640,7 @@ const Treatments: React.FC<TreatmentsProps> = ({ activePatients, appointments, c
                           <button onClick={() => setIsAddPatientModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
                       </div>
                       <form onSubmit={handleQuickAddPatient} className="space-y-4">
-                          <input type="text" placeholder="Patient Name" required className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={newPatientForm.name} onChange={e => setNewPatientForm({...newPatientForm, name: e.target.value})} />
+                          <input type="text" placeholder="Patient Name" required className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" value={newPatientForm.name} onChange={e => setNewPatientForm({...newPatientForm, name: e.target.value})} />
                           <div className="grid grid-cols-2 gap-4">
                               <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" value={newPatientForm.species} onChange={e => setNewPatientForm({...newPatientForm, species: e.target.value})}>
                                   {Object.values(Species).map(s => <option key={s} value={s}>{s}</option>)}
@@ -814,50 +663,45 @@ const Treatments: React.FC<TreatmentsProps> = ({ activePatients, appointments, c
   );
 };
 
-// --- HELPER COMPONENT FOR PRINTING (INVOICE + RECORD) ---
+// --- HELPER COMPONENT FOR PRINTING ---
 const PrintableContent = ({ pet, owner, consult, settings, isPrint = false }: { pet: Pet | null, owner: Owner | null, consult: Consultation | null, settings: ClinicSettings, isPrint?: boolean }) => {
     if (!consult || !pet || !owner) return <div>Data Missing</div>;
 
     const total = consult.financials?.total || 0;
     const paid = consult.financials?.amountPaid || 0;
     const balance = Math.max(0, total - paid);
-    
-    // Safely retrieve prescriptions as array
     const prescriptionList = safeArray(consult.prescription);
 
     return (
-        <div className={`font-serif text-slate-900 ${isPrint ? 'w-full max-w-[210mm]' : 'p-4'}`}>
-            {/* INVOICE HEADER */}
+        <div className={`font-serif text-slate-900 ${isPrint ? 'w-full max-w-[210mm]' : 'p-2 md:p-4'}`}>
             <div className="flex justify-between items-start border-b-2 border-slate-800 pb-6 mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold uppercase tracking-widest text-slate-800">{settings.name}</h1>
-                    <p className="text-sm mt-2 text-slate-600 w-64">{settings.address}</p>
-                    <p className="text-sm text-slate-600 mt-1">{settings.phone} | {settings.email}</p>
+                    <h1 className="text-xl md:text-2xl font-bold uppercase tracking-widest text-slate-800">{settings.name}</h1>
+                    <p className="text-xs md:text-sm mt-2 text-slate-600">{settings.address}</p>
+                    <p className="text-xs md:text-sm text-slate-600">{settings.phone}</p>
                 </div>
                 <div className="text-right">
-                    <h2 className="text-xl font-bold text-slate-400 uppercase">Medical Invoice</h2>
-                    <p className="text-sm font-mono mt-2">Inv #: {consult.financials?.invoiceId || 'N/A'}</p>
-                    <p className="text-sm font-mono">Date: {new Date(consult.date).toLocaleDateString()}</p>
+                    <h2 className="text-lg md:text-xl font-bold text-slate-400 uppercase">Invoice</h2>
+                    <p className="text-xs md:text-sm font-mono mt-2">#{consult.financials?.invoiceId || 'N/A'}</p>
+                    <p className="text-xs md:text-sm font-mono">{new Date(consult.date).toLocaleDateString()}</p>
                 </div>
             </div>
 
-            {/* BILL TO */}
-            <div className="flex justify-between mb-8 text-sm">
+            <div className="flex justify-between mb-8 text-xs md:text-sm">
                 <div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Billed To</h3>
-                    <p className="font-bold text-lg">{owner.name}</p>
+                    <h3 className="font-bold text-slate-400 uppercase mb-1">Billed To</h3>
+                    <p className="font-bold text-base md:text-lg">{owner.name}</p>
                     <p>{owner.phone}</p>
                 </div>
                 <div className="text-right">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Patient</h3>
-                    <p className="font-bold text-lg">{pet.name}</p>
-                    <p>{pet.species} - {pet.breed} ({pet.gender})</p>
+                    <h3 className="font-bold text-slate-400 uppercase mb-1">Patient</h3>
+                    <p className="font-bold text-base md:text-lg">{pet.name}</p>
+                    <p>{pet.species} ({pet.gender})</p>
                 </div>
             </div>
 
-            {/* FINANCIAL TABLE */}
-            <div className="mb-8">
-                <table className="w-full text-sm border-collapse">
+            <div className="mb-8 overflow-x-auto">
+                <table className="w-full text-xs md:text-sm border-collapse">
                     <thead>
                         <tr className="bg-slate-100 border-b border-slate-200">
                             <th className="py-2 px-4 text-left font-bold text-slate-600">Description</th>
@@ -866,7 +710,7 @@ const PrintableContent = ({ pet, owner, consult, settings, isPrint = false }: { 
                     </thead>
                     <tbody>
                         <tr className="border-b border-slate-100">
-                            <td className="py-3 px-4">Veterinary Consultation & Examination</td>
+                            <td className="py-3 px-4">Consultation & Services</td>
                             <td className="py-3 px-4 text-right">{formatCurrency(consult.financials?.serviceFee || 0, settings.currency)}</td>
                         </tr>
                         {prescriptionList.map((rx: any, i: number) => (
@@ -875,52 +719,20 @@ const PrintableContent = ({ pet, owner, consult, settings, isPrint = false }: { 
                                 <td className="py-2 px-4 text-right">-</td>
                             </tr>
                         ))}
-                        {consult.financials?.discount > 0 && (
-                            <tr className="border-b border-slate-100 text-rose-600">
-                                <td className="py-3 px-4">Discount Applied</td>
-                                <td className="py-3 px-4 text-right">-{formatCurrency(consult.financials.discount, settings.currency)}</td>
-                            </tr>
-                        )}
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td className="py-3 px-4 text-right font-bold uppercase text-xs">Total</td>
+                            <td className="py-3 px-4 text-right font-bold uppercase">Total</td>
                             <td className="py-3 px-4 text-right font-bold text-lg">{formatCurrency(total, settings.currency)}</td>
-                        </tr>
-                        <tr>
-                            <td className="py-1 px-4 text-right font-bold uppercase text-xs text-emerald-600">Paid ({consult.financials?.paymentMethod})</td>
-                            <td className="py-1 px-4 text-right font-bold text-emerald-600">{formatCurrency(paid, settings.currency)}</td>
-                        </tr>
-                        <tr>
-                            <td className="py-3 px-4 text-right font-bold uppercase text-xs text-slate-900">Balance Due</td>
-                            <td className="py-3 px-4 text-right font-bold text-xl border-t-2 border-slate-800">{formatCurrency(balance, settings.currency)}</td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
 
-            {/* MEDICAL SUMMARY */}
-            <div className="border-t border-slate-200 pt-8 mt-4">
-                <h3 className="text-sm font-bold uppercase tracking-widest mb-4 text-slate-500 border-b border-slate-200 pb-2">Medical Summary</h3>
-                <div className="grid grid-cols-2 gap-8 text-sm">
-                    <div>
-                        <p className="font-bold text-slate-700 mb-1">Diagnosis</p>
-                        <p className="mb-4">{consult.diagnosis.tentative}</p>
-                        
-                        <p className="font-bold text-slate-700 mb-1">Vitals</p>
-                        <p>Wt: {consult.vitals.weightKg}kg | Temp: {consult.vitals.temperatureC}°C</p>
-                    </div>
-                    <div>
-                        <p className="font-bold text-slate-700 mb-1">Instructions / Plan</p>
-                        <p className="whitespace-pre-wrap">{consult.plan}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Footer */}
-            <div className="mt-16 text-center text-xs text-slate-400">
-                <p>Thank you for trusting {settings.name} with your pet's care.</p>
-                <p>This document is a computer-generated receipt and medical record.</p>
+            <div className="border-t border-slate-200 pt-8 mt-4 text-xs md:text-sm">
+                <h3 className="font-bold uppercase tracking-widest mb-4 text-slate-500 border-b border-slate-200 pb-2">Medical Summary</h3>
+                <p><span className="font-bold">Diagnosis:</span> {consult.diagnosis.tentative}</p>
+                <p className="mt-2 whitespace-pre-wrap">{consult.plan}</p>
             </div>
         </div>
     );

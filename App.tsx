@@ -18,8 +18,10 @@ import LoadingScreen from './components/LoadingScreen';
 import PageTransition from './components/PageTransition';
 import DynamicIsland, { ToastType } from './components/DynamicIsland';
 import SpotlightSearch from './components/SpotlightSearch';
+import MobileNavbar from './components/MobileNavbar'; // NEW IMPORT
+import InstallPrompt from './components/InstallPrompt'; // NEW IMPORT
 import { Auth } from './components/Auth';
-import { LogOut, User as UserIcon, Search, Home, Menu } from 'lucide-react';
+import { LogOut, User as UserIcon, Search, Home } from 'lucide-react';
 import { AuthService, PatientService, OwnerService, InventoryService, AppointmentService, SaleService, ConsultationService, LabService, ExpenseService, PlanService, UserService, BranchService, SettingsService, LogService } from './services/api';
 import { getAvatarGradient } from './utils/uiUtils';
 
@@ -331,17 +333,16 @@ const App: React.FC = () => {
   const currency = currentTenant?.settings?.currency || 'USD';
 
   return (
-    // UPDATED: Changed h-screen to h-[100dvh] for mobile browsers and removed w-screen to prevent x-scroll
     <div className="flex h-[100dvh] w-full overflow-hidden bg-slate-100 font-sans">
       <DynamicIsland type={toast.type} message={toast.message} isVisible={toast.visible} onClose={hideToast} />
       <SpotlightSearch isOpen={isSpotlightOpen} onClose={() => setIsSpotlightOpen(false)} onNavigate={setCurrentView} />
+      <InstallPrompt />
       
       {isSaving && <LoadingScreen message="Saving changes..." />}
       
-      {/* UPDATED: Main container handles the flex layout better */}
       <main className="flex-1 flex flex-col relative transition-all duration-300 h-full w-full overflow-hidden">
         
-        {/* HEADER: Updated padding/margins for mobile responsiveness */}
+        {/* HEADER */}
         <header className="shrink-0 z-30 relative mx-2 mt-2 md:mx-4 md:mt-4 rounded-xl md:rounded-2xl border border-white/60 shadow-sm glass-panel flex items-center justify-between px-3 md:px-6 py-2 md:py-0 h-16">
             <div className="flex items-center space-x-2 md:space-x-3">
                 {currentView !== 'dashboard' && (
@@ -368,7 +369,6 @@ const App: React.FC = () => {
                 <span className="text-[10px] font-bold border border-slate-300 rounded px-1.5 py-0.5 bg-white shadow-sm">⌘K</span>
             </button>
 
-            {/* Mobile Search Icon */}
             <button 
                 onClick={() => setIsSpotlightOpen(true)}
                 className="md:hidden p-2 text-slate-600 bg-white/50 rounded-lg"
@@ -409,7 +409,7 @@ const App: React.FC = () => {
             </div>
         </header>
         
-        {/* CONTENT AREA: Added overflow-y-auto to allow scrolling within the main area */}
+        {/* CONTENT AREA - Added bottom padding to account for mobile nav */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 md:p-4 pb-24 md:pb-4 scroll-smooth" id="main-scroll-container">
             <PageTransition view={currentView}>
                 <div className="w-full max-w-full">
@@ -431,6 +431,13 @@ const App: React.FC = () => {
                 </div>
             </PageTransition>
         </div>
+        
+        {/* NEW: Mobile Bottom Navigation */}
+        <MobileNavbar 
+          currentView={currentView} 
+          onNavigate={setCurrentView} 
+          onOpenMenu={() => setIsSpotlightOpen(true)} 
+        />
         
         <AIAssistant plan={currentTenant?.plan} />
       </main>

@@ -4,26 +4,58 @@ import axios from 'axios';
 const PRODUCTION_API_URL = 'https://vetnexus-backend.onrender.com/api';
 const LOCAL_API_URL = 'http://localhost:4000/api';
 
-const baseURL = import.meta.env.MODE === 'production' 
+// Use environment variable if available, otherwise fallback based on mode
+const baseURL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' 
   ? PRODUCTION_API_URL
-  : LOCAL_API_URL;
+  : LOCAL_API_URL);
 
 console.log("API Configured to:", baseURL);
 
 const api = axios.create({
   baseURL,
-  withCredentials: true,
+  withCredentials: true, // Keep this if you use cookies, but usually Token is enough
   headers: {
     'Content-Type': 'application/json',
   }
 });
 
+// --- 1. REQUEST INTERCEPTOR (The Fix for 401s) ---
+// This attaches the token to every request automatically
+api.interceptors.request.use(
+  (config) => {
+    // Check both standard keys. Adjust 'token' to match what you use in Login.tsx
+    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+    
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// --- 2. RESPONSE INTERCEPTOR ---
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.config) {
         console.error(`API Request failed on: ${error.config.url}`);
     }
+
+    // Handle Session Expiry (Auto Logout)
+    if (error.response?.status === 401) {
+        // Optional: Only clear if it's not the login endpoint itself
+        if (!error.config.url.includes('/login')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            // Optional: Force reload to login page
+            // window.location.href = '/login'; 
+        }
+    }
+
     const message = error.response?.data?.error || error.message || 'An unexpected error occurred';
     return Promise.reject({ ...error, message });
   }
@@ -34,7 +66,11 @@ api.interceptors.response.use(
 export const AuthService = {
   login: (credentials: any) => api.post('/auth/login', credentials),
   signup: (data: any, paymentRef?: string) => api.post('/auth/signup', { ...data, paymentRef }),
-  logout: () => api.post('/auth/logout'),
+  logout: () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    return api.post('/auth/logout');
+  },
   getMe: () => api.get('/auth/me'),
 };
 
@@ -61,8 +97,11 @@ export const PatientService = {
 
 export const OwnerService = {
   getAll: () => api.get('/owners'),
+  // Duplication check helper
+  checkDuplicate: (name: string, phone: string) => api.get(`/owners/check-duplicate?name=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}`),
   create: (data: any) => api.post('/owners', data),
-  // NEW: Update Portal Access (Set Password)
+  update: (id: string, data: any) => api.patch(`/owners/${id}`, data),
+  delete: (id: string) => api.delete(`/owners/${id}`),
   updatePortalAccess: (id: string, data: { password?: string, isActive: boolean }) => api.patch(`/owners/${id}/portal`, data),
 };
 

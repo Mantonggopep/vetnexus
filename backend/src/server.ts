@@ -13,6 +13,7 @@ import { userRoutes } from './routes/user.routes';
 import { clinicalRoutes } from './routes/clinical.routes';
 import { inventoryRoutes } from './routes/inventory.routes';
 import { aiRoutes } from './routes/ai.routes';
+import { clientPortalRoutes } from './routes/client.portal.routes'; // <--- NEW IMPORT
 
 const app: FastifyInstance = Fastify({ 
   logger: process.env.NODE_ENV !== 'production',
@@ -44,7 +45,6 @@ app.register(cors, {
     }
 
     // 4. ✅ FIX: Allow ALL Vercel Preview URLs (Dynamic)
-    // This allows https://vetnexuspro-git-main... etc.
     if (origin.endsWith('.vercel.app')) {
       return cb(null, true);
     }
@@ -80,7 +80,10 @@ app.register(async (api) => {
     api.register(userRoutes);
     api.register(clinicalRoutes);
     api.register(inventoryRoutes);
-    api.register(aiRoutes, { prefix: '/ai' }); 
+    api.register(aiRoutes, { prefix: '/ai' });
+    
+    // NEW: Register Client Portal Routes
+    api.register(clientPortalRoutes, { prefix: '/portal' }); 
 }, { prefix: '/api' });
 
 

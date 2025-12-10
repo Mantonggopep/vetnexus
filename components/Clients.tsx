@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Owner, Pet, SaleRecord, Species } from '../types';
-import { Search, Mail, Phone, MapPin, ChevronRight, ArrowLeft, Plus, PawPrint, DollarSign, User } from 'lucide-react';
+import { 
+  Search, Mail, Phone, MapPin, ChevronRight, ArrowLeft, Plus, 
+  PawPrint, DollarSign, User, Key, Shield, CheckCircle2, XCircle 
+} from 'lucide-react';
 import { formatCurrency } from '../utils/uiUtils';
 import { OwnerService, PatientService, SaleService } from '../services/api'; 
 
@@ -19,13 +22,17 @@ const Clients: React.FC<ClientsProps> = ({ currency = 'USD' }) => {
   const [activeTab, setActiveTab] = useState<'patients' | 'financials' | 'communication'>('patients');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Modals
   const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
   const [isAddPatientModalOpen, setIsAddPatientModalOpen] = useState(false);
+  const [isPortalModalOpen, setIsPortalModalOpen] = useState(false);
   
+  // Forms
   const [newClient, setNewClient] = useState({ name: '', email: '', phone: '', address: '' });
   const [newPatient, setNewPatient] = useState({ 
       name: '', species: 'Dog', breed: '', age: '', gender: 'Male', allergies: '', color: '', initialWeight: ''
   });
+  const [portalForm, setPortalForm] = useState({ password: '', isActive: false });
 
   const refreshData = async () => {
       setIsLoading(true);
@@ -91,6 +98,33 @@ const Clients: React.FC<ClientsProps> = ({ currency = 'USD' }) => {
       } catch (error) {
           console.error("Failed to create patient", error);
       }
+  };
+
+  // --- PORTAL HANDLERS ---
+  const handleOpenPortalModal = () => {
+    const client = owners.find(o => o.id === selectedClientId);
+    if (client) {
+        // @ts-ignore
+        setPortalForm({ password: '', isActive: client.isPortalActive || false });
+        setIsPortalModalOpen(true);
+    }
+  };
+
+  const handleUpdatePortalAccess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClientId) return;
+
+    try {
+      await OwnerService.updatePortalAccess(selectedClientId, {
+        password: portalForm.password || undefined,
+        isActive: portalForm.isActive
+      });
+      alert("Portal settings updated.");
+      setIsPortalModalOpen(false);
+      refreshData(); // Refresh to show updated status
+    } catch (error) {
+      alert("Failed to update portal settings.");
+    }
   };
 
   const filteredOwners = owners.filter(owner => 
@@ -160,6 +194,27 @@ const Clients: React.FC<ClientsProps> = ({ currency = 'USD' }) => {
                                         <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><MapPin className="w-4 h-4" /></div>
                                         <span className="text-sm font-bold text-slate-700 truncate">{selectedClient.address || 'No Address'}</span>
                                     </div>
+
+                                    {/* Portal Access Button */}
+                                    <button 
+                                        onClick={handleOpenPortalModal}
+                                        className="w-full p-3 bg-indigo-50 rounded-xl flex items-center justify-between group hover:bg-indigo-100 transition-colors mt-2"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-200">
+                                                <Key className="w-4 h-4" />
+                                            </div>
+                                            <div className="text-left">
+                                                <span className="block text-sm font-bold text-slate-700">Client Portal</span>
+                                                {/* @ts-ignore */}
+                                                <span className={`text-[10px] font-bold uppercase ${selectedClient.isPortalActive ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                                    {/* @ts-ignore */}
+                                                    {selectedClient.isPortalActive ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <ChevronRight className="w-4 h-4 text-indigo-300 group-hover:text-indigo-500" />
+                                    </button>
                                 </div>
                               </div>
                           </div>
@@ -232,7 +287,8 @@ const Clients: React.FC<ClientsProps> = ({ currency = 'USD' }) => {
                       </div>
                   </div>
               </div>
-               {/* Modal for adding patient would go here (simplified for brevity) */}
+
+               {/* Add Patient Modal */}
                {isAddPatientModalOpen && (
                     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-3xl w-full max-w-sm p-6 animate-scale-in">
@@ -242,6 +298,53 @@ const Clients: React.FC<ClientsProps> = ({ currency = 'USD' }) => {
                                 <button onClick={() => setIsAddPatientModalOpen(false)} className="flex-1 py-3 text-slate-500 font-bold text-sm">Cancel</button>
                                 <button onClick={handleSavePatient} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm">Save</button>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Portal Management Modal */}
+                {isPortalModalOpen && (
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl w-full max-w-sm p-6 animate-scale-in border-t-4 border-indigo-500 shadow-2xl">
+                             <div className="flex flex-col items-center mb-6">
+                                <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mb-3">
+                                    <Shield className="w-6 h-6" />
+                                </div>
+                                <h3 className="font-black text-xl text-slate-900">Portal Access</h3>
+                                <p className="text-xs text-slate-400 font-bold mt-1">Manage login for {selectedClient.name}</p>
+                             </div>
+                             
+                             <form onSubmit={handleUpdatePortalAccess} className="space-y-4">
+                                <div className="bg-slate-50 p-4 rounded-2xl flex items-center justify-between border border-slate-100">
+                                    <span className="text-sm font-bold text-slate-700">Enable Access</span>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            className="sr-only peer"
+                                            checked={portalForm.isActive}
+                                            onChange={e => setPortalForm({...portalForm, isActive: e.target.checked})}
+                                        />
+                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                    </label>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">New Password</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Enter password..." 
+                                        className="w-full p-4 bg-slate-50 rounded-2xl text-sm font-mono focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                        value={portalForm.password}
+                                        onChange={e => setPortalForm({...portalForm, password: e.target.value})}
+                                    />
+                                    <p className="text-[10px] text-slate-400 font-medium mt-2 ml-1">Leave blank to keep current password.</p>
+                                </div>
+
+                                <div className="flex gap-2 pt-2">
+                                    <button type="button" onClick={() => setIsPortalModalOpen(false)} className="flex-1 py-3 text-slate-500 font-bold text-sm hover:bg-slate-50 rounded-xl transition-colors">Cancel</button>
+                                    <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">Save Changes</button>
+                                </div>
+                             </form>
                         </div>
                     </div>
                 )}

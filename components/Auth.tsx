@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Added for redirection
 import { Tenant, UserProfile, SubscriptionTier, BillingPeriod, SubscriptionPlan } from '../types';
-import { Shield, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Shield, Mail, Lock, AlertCircle, User, ShieldCheck, PawPrint } from 'lucide-react'; // Added icons
+import { ClientPortalService } from '../services/api'; // Added for Client Login
 
 interface AuthProps {
   onLogin: (email: string, password: string) => Promise<boolean>;
@@ -8,7 +10,7 @@ interface AuthProps {
   plans?: SubscriptionPlan[];
 }
 
-// DEFINING PLANS - REMOVED 'print' property as it was causing TS errors
+// DEFINING PLANS
 const DEFAULT_PLANS: SubscriptionPlan[] = [
     {
         id: 'Trial',
@@ -77,11 +79,16 @@ declare global {
 }
 
 export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_PLANS }) => {
+  const navigate = useNavigate(); // Added navigation
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   
+  // --- NEW: USER TYPE TOGGLE ---
+  const [userType, setUserType] = useState<'STAFF' | 'CLIENT'>('STAFF');
+
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false); // Loading state for login
 
   const [step, setStep] = useState(1);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -99,12 +106,33 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_P
   const handleLoginSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setLoginError('');
-      const success = await onLogin(loginEmail, loginPass);
-      if (!success) {
-          setLoginError('Invalid email or password.');
+      setIsLoggingIn(true);
+
+      try {
+        // --- 1. CLIENT LOGIN LOGIC ---
+        if (userType === 'CLIENT') {
+            try {
+                await ClientPortalService.login({ email: loginEmail, password: loginPass });
+                navigate('/portal/dashboard');
+            } catch (err: any) {
+                setLoginError(err.message || 'Invalid Client Credentials');
+            }
+            return;
+        }
+
+        // --- 2. STAFF LOGIN LOGIC ---
+        const success = await onLogin(loginEmail, loginPass);
+        if (!success) {
+            setLoginError('Invalid email or password.');
+        }
+      } catch (error) {
+          setLoginError('An unexpected error occurred.');
+      } finally {
+          setIsLoggingIn(false);
       }
   };
 
+  // ... (Existing Payment Logic remains unchanged) ...
   const handlePaymentAndSignup = async () => {
       const configKey = `${signupData.plan}_${signupData.billingPeriod}`;
       const planConfig = FLUTTERWAVE_CONFIG[configKey];
@@ -193,8 +221,10 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_P
           plan: signupData.plan,
           billingPeriod: signupData.billingPeriod,
           settings: {
+              currency: currency, timezone: 'UTC',
+              // @ts-ignore
               name: signupData.clinicName, address: '', phone: '', email: signupData.email, website: '',
-              taxRate: 7.5, currency: currency, bankDetails: '',
+              taxRate: 7.5, bankDetails: '',
               clientPrefix: 'CL-', invoicePrefix: 'INV-', receiptPrefix: 'REC-', patientPrefix: 'P-'
           },
           status: 'Active',
@@ -203,27 +233,65 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_P
       };
 
       const newUser: UserProfile = {
-          id: `u-${Date.now()}`, name: signupData.name, email: signupData.email, roles: ['Admin'], tenantId: tenantId
+          id: `u-${Date.now()}`, name: signupData.name, email: signupData.email, roles: ['Admin'], tenantId: tenantId, preferences: {}
       };
 
       onSignup(newUser, newTenant, signupData.password, paymentRef);
   };
 
+  // --- LOGIN VIEW ---
   if (mode === 'login') {
       return (
           <div className="min-h-screen bg-teal-50 flex flex-col items-center justify-center p-4">
               <div className="mb-8 text-center">
                   <div className="flex items-center justify-center space-x-2 mb-2">
-                      <Shield className="w-12 h-12 text-teal-600" />
-                      <h1 className="text-4xl font-extrabold text-teal-900 tracking-tight">Vet Nexus Pro</h1>
+                      <div className="w-14 h-14 bg-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-teal-200">
+                        {userType === 'CLIENT' ? <PawPrint className="w-8 h-8 text-white" /> : <Shield className="w-8 h-8 text-white" />}
+                      </div>
                   </div>
-                  <p className="text-teal-600 font-medium">Practice Management Simplified</p>
+                  <h1 className="text-3xl font-extrabold text-teal-900 tracking-tight mt-4">Vet Nexus Pro</h1>
+                  <p className="text-teal-600 font-medium opacity-80">{userType === 'CLIENT' ? 'Pet Owner Portal' : 'Practice Management System'}</p>
               </div>
 
-              <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-teal-100">
-                  <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">Welcome Back</h2>
+              <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border border-teal-100/50">
+                  
+                  {/* --- STAFF / CLIENT TOGGLE --- */}
+                  <div className="bg-slate-100 p-1 rounded-xl flex mb-6 relative">
+                    <button
+                        type="button"
+                        onClick={() => setUserType('STAFF')}
+                        className={`flex-1 flex items-center justify-center py-2.5 text-sm font-bold rounded-lg transition-all relative z-10 ${
+                            userType === 'STAFF' 
+                            ? 'bg-white text-teal-700 shadow-sm' 
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                    >
+                        <ShieldCheck className={`w-4 h-4 mr-2 ${userType === 'STAFF' ? 'text-teal-600' : 'text-slate-400'}`} />
+                        Clinic Staff
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setUserType('CLIENT')}
+                        className={`flex-1 flex items-center justify-center py-2.5 text-sm font-bold rounded-lg transition-all relative z-10 ${
+                            userType === 'CLIENT' 
+                            ? 'bg-white text-teal-700 shadow-sm' 
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                    >
+                        <User className={`w-4 h-4 mr-2 ${userType === 'CLIENT' ? 'text-teal-600' : 'text-slate-400'}`} />
+                        Pet Owner
+                    </button>
+                  </div>
+
+                  <h2 className="text-2xl font-black text-slate-800 mb-2 text-center">
+                    {userType === 'CLIENT' ? 'Welcome Back' : 'Staff Login'}
+                  </h2>
+                  <p className="text-center text-slate-400 text-sm mb-6">
+                    {userType === 'CLIENT' ? 'Access your pet\'s records' : 'Enter your credentials to continue'}
+                  </p>
+
                   {loginError && (
-                      <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg flex items-center text-red-600 text-sm font-medium animate-shake">
+                      <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-center text-red-600 text-sm font-bold animate-pulse">
                           <AlertCircle className="w-4 h-4 mr-2" />
                           {loginError}
                       </div>
@@ -231,110 +299,142 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onSignup, plans = DEFAULT_P
 
                   <form onSubmit={handleLoginSubmit} className="space-y-4">
                       <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-1">Email Address</label>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Email Address</label>
                           <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                              <input type="email" required className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" placeholder="you@clinic.com" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
+                              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                              <input type="email" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-transparent focus:bg-white border focus:border-teal-500 rounded-2xl focus:ring-4 focus:ring-teal-500/10 outline-none transition-all font-semibold text-slate-700" placeholder={userType === 'CLIENT' ? "owner@example.com" : "doctor@clinic.com"} value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
                           </div>
                       </div>
                       <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-1">Password</label>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Password</label>
                           <div className="relative">
-                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                              <input type="password" required className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" placeholder="••••••••" value={loginPass} onChange={e => setLoginPass(e.target.value)} />
+                              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                              <input type="password" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-transparent focus:bg-white border focus:border-teal-500 rounded-2xl focus:ring-4 focus:ring-teal-500/10 outline-none transition-all font-semibold text-slate-700" placeholder="••••••••" value={loginPass} onChange={e => setLoginPass(e.target.value)} />
                           </div>
                       </div>
-                      <button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 rounded-lg font-bold shadow-lg shadow-teal-200 transition-all transform active:scale-95">Log In</button>
+                      <button type="submit" disabled={isLoggingIn} className="w-full bg-teal-600 hover:bg-teal-700 text-white py-4 rounded-xl font-bold shadow-lg shadow-teal-200 transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed">
+                          {isLoggingIn ? 'Authenticating...' : (userType === 'CLIENT' ? 'Access Portal' : 'Log In')}
+                      </button>
                   </form>
-                  <div className="mt-6 text-center text-sm">
-                      <span className="text-slate-500">New to Vet Nexus? </span>
-                      <button onClick={() => setMode('signup')} className="text-teal-600 font-bold hover:underline">Create Account</button>
-                  </div>
+                  
+                  {userType === 'STAFF' ? (
+                      <div className="mt-8 text-center text-sm">
+                          <span className="text-slate-500 font-medium">New to Vet Nexus? </span>
+                          <button onClick={() => setMode('signup')} className="text-teal-600 font-bold hover:underline">Create Account</button>
+                      </div>
+                  ) : (
+                      <div className="mt-8 text-center text-xs text-slate-400 px-4 leading-relaxed">
+                          Don't have an account? Contact your veterinary clinic to receive your login credentials.
+                      </div>
+                  )}
               </div>
           </div>
       );
   }
 
-  // SIGNUP WIZARD
+  // SIGNUP WIZARD (Strictly for Staff/Tenants)
   return (
       <div className="min-h-screen bg-teal-50 flex flex-col items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl border border-teal-100 overflow-hidden flex flex-col md:flex-row h-[700px]">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-5xl border border-teal-100 overflow-hidden flex flex-col md:flex-row h-[700px] animate-fade-in-up">
               <div className="bg-teal-900 text-white p-10 md:w-1/3 flex flex-col justify-between relative overflow-hidden">
                    <div className="relative z-10">
-                      <h2 className="text-3xl font-bold mb-4">Join 2,000+ Clinics</h2>
-                      <p className="text-teal-200/80">Experience the future of veterinary practice management.</p>
+                      <div className="w-12 h-12 bg-teal-800 rounded-xl flex items-center justify-center mb-6">
+                          <Shield className="w-6 h-6" />
+                      </div>
+                      <h2 className="text-3xl font-black mb-4 leading-tight">Join 2,000+ Clinics</h2>
+                      <p className="text-teal-200/80 font-medium leading-relaxed">Experience the future of veterinary practice management with AI-driven insights.</p>
                    </div>
+                   
+                   {/* Decorative Elements */}
+                   <div className="absolute top-0 right-0 w-64 h-64 bg-teal-800 rounded-full blur-3xl -mr-16 -mt-16 opacity-50"></div>
+                   <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-950 rounded-full blur-3xl -ml-16 -mb-16 opacity-50"></div>
               </div>
 
-              <div className="p-10 md:w-2/3 overflow-y-auto">
+              <div className="p-10 md:w-2/3 overflow-y-auto bg-white relative">
                   <div className="flex justify-between items-center mb-8">
-                      <h2 className="text-2xl font-bold text-slate-800">Create Account</h2>
+                      <h2 className="text-2xl font-black text-slate-800">Create Account</h2>
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Step {step} of 4</div>
                   </div>
 
                   <form onSubmit={(e) => e.preventDefault()}>
                       {step === 1 && (
                           <div className="space-y-5 animate-fade-in">
-                              <h3 className="font-bold text-slate-500 uppercase text-xs tracking-wide">Step 1: Administrator</h3>
-                              <input type="text" required className="w-full p-3 border rounded-lg" placeholder="Full Name" value={signupData.name} onChange={e => setSignupData({...signupData, name: e.target.value})} />
-                              <input type="email" required className="w-full p-3 border rounded-lg" placeholder="Email" value={signupData.email} onChange={e => setSignupData({...signupData, email: e.target.value})} />
-                              <input type="password" required className="w-full p-3 border rounded-lg" placeholder="Password" value={signupData.password} onChange={e => setSignupData({...signupData, password: e.target.value})} />
-                              <button type="button" onClick={() => setStep(2)} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold mt-4">Next</button>
+                              <h3 className="font-bold text-teal-600 uppercase text-xs tracking-wide">Administrator Details</h3>
+                              <input type="text" required className="w-full p-4 bg-slate-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none transition-all font-semibold" placeholder="Full Name" value={signupData.name} onChange={e => setSignupData({...signupData, name: e.target.value})} />
+                              <input type="email" required className="w-full p-4 bg-slate-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none transition-all font-semibold" placeholder="Email Address" value={signupData.email} onChange={e => setSignupData({...signupData, email: e.target.value})} />
+                              <input type="password" required className="w-full p-4 bg-slate-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none transition-all font-semibold" placeholder="Create Password" value={signupData.password} onChange={e => setSignupData({...signupData, password: e.target.value})} />
+                              <button type="button" onClick={() => setStep(2)} className="w-full bg-teal-600 hover:bg-teal-700 text-white py-4 rounded-xl font-bold mt-4 shadow-lg shadow-teal-200 transition-all">Continue</button>
                           </div>
                       )}
                       
                       {step === 2 && (
                           <div className="space-y-5 animate-fade-in">
-                              <h3 className="font-bold text-slate-500 uppercase text-xs tracking-wide">Step 2: Clinic</h3>
-                              <input type="text" required className="w-full p-3 border rounded-lg" placeholder="Clinic Name" value={signupData.clinicName} onChange={e => setSignupData({...signupData, clinicName: e.target.value})} />
-                              <select className="w-full p-3 border rounded-lg" value={signupData.country} onChange={e => setSignupData({...signupData, country: e.target.value})}>
-                                  <option value="Nigeria">Nigeria</option>
-                                  <option value="USA">USA</option>
-                              </select>
+                              <h3 className="font-bold text-teal-600 uppercase text-xs tracking-wide">Clinic Information</h3>
+                              <input type="text" required className="w-full p-4 bg-slate-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none transition-all font-semibold" placeholder="Clinic Name" value={signupData.clinicName} onChange={e => setSignupData({...signupData, clinicName: e.target.value})} />
+                              <div className="relative">
+                                <select className="w-full p-4 bg-slate-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none transition-all font-semibold appearance-none" value={signupData.country} onChange={e => setSignupData({...signupData, country: e.target.value})}>
+                                    <option value="Nigeria">Nigeria</option>
+                                    <option value="USA">USA</option>
+                                    <option value="UK">UK</option>
+                                    <option value="Ghana">Ghana</option>
+                                    <option value="Kenya">Kenya</option>
+                                </select>
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">▼</div>
+                              </div>
                               <div className="flex space-x-3 mt-4">
-                                  <button onClick={() => setStep(1)} className="flex-1 bg-slate-100 py-3 rounded-lg">Back</button>
-                                  <button onClick={() => setStep(3)} className="flex-1 bg-teal-600 text-white py-3 rounded-lg">Next</button>
+                                  <button onClick={() => setStep(1)} className="flex-1 bg-white border border-slate-200 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-50">Back</button>
+                                  <button onClick={() => setStep(3)} className="flex-1 bg-teal-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-teal-200">Next</button>
                               </div>
                           </div>
                       )}
 
                       {step === 3 && (
-                          <div className="space-y-5">
-                               <h3 className="font-bold text-slate-500 uppercase text-xs tracking-wide">Step 3: Plan</h3>
-                               <div className="flex justify-end space-x-2 mb-2">
-                                   <button className={`px-2 py-1 text-xs rounded ${signupData.billingPeriod === 'Monthly' ? 'bg-teal-600 text-white' : 'bg-gray-100'}`} onClick={() => setSignupData({...signupData, billingPeriod: 'Monthly'})}>Monthly</button>
-                                   <button className={`px-2 py-1 text-xs rounded ${signupData.billingPeriod === 'Yearly' ? 'bg-teal-600 text-white' : 'bg-gray-100'}`} onClick={() => setSignupData({...signupData, billingPeriod: 'Yearly'})}>Yearly</button>
+                          <div className="space-y-5 animate-fade-in">
+                               <div className="flex justify-between items-center">
+                                    <h3 className="font-bold text-teal-600 uppercase text-xs tracking-wide">Select Plan</h3>
+                                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                                        <button className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${signupData.billingPeriod === 'Monthly' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-400'}`} onClick={() => setSignupData({...signupData, billingPeriod: 'Monthly'})}>Monthly</button>
+                                        <button className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${signupData.billingPeriod === 'Yearly' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-400'}`} onClick={() => setSignupData({...signupData, billingPeriod: 'Yearly'})}>Yearly</button>
+                                    </div>
                                </div>
-                               <div className="grid grid-cols-2 gap-2 h-64 overflow-y-auto">
+                               
+                               <div className="grid grid-cols-2 gap-3 h-64 overflow-y-auto pr-2 custom-scrollbar">
                                   {plans.map(p => (
-                                      <div key={p.id} onClick={() => setSignupData({...signupData, plan: p.id as SubscriptionTier})} className={`p-4 border rounded-lg cursor-pointer ${signupData.plan === p.id ? 'border-teal-500 bg-teal-50' : ''}`}>
-                                          <div className="font-bold text-slate-800">{p.name}</div>
-                                          <div className="text-teal-600 font-bold">{signupData.billingPeriod === 'Monthly' ? p.price.Monthly : p.price.Yearly}</div>
-                                          <ul className="text-xs text-slate-500 mt-2 space-y-1">
-                                              {p.features.slice(0, 3).map((f, i) => <li key={i}>- {f}</li>)}
+                                      <div key={p.id} onClick={() => setSignupData({...signupData, plan: p.id as SubscriptionTier})} className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${signupData.plan === p.id ? 'border-teal-500 bg-teal-50' : 'border-slate-100 hover:border-teal-200'}`}>
+                                          <div className="font-black text-slate-800">{p.name}</div>
+                                          <div className="text-teal-600 font-bold text-sm mt-1">{signupData.billingPeriod === 'Monthly' ? p.price.Monthly : p.price.Yearly}</div>
+                                          <ul className="text-[10px] text-slate-500 mt-3 space-y-1.5 font-medium">
+                                              {p.features.slice(0, 3).map((f, i) => <li key={i} className="flex items-center"><div className="w-1 h-1 bg-teal-400 rounded-full mr-1.5"></div> {f}</li>)}
                                           </ul>
                                       </div>
                                   ))}
                                </div>
                                <div className="flex space-x-3 mt-4">
-                                  <button onClick={() => setStep(2)} className="flex-1 bg-slate-100 py-3 rounded-lg">Back</button>
-                                  <button onClick={() => setStep(4)} className="flex-1 bg-teal-600 text-white py-3 rounded-lg">Payment</button>
+                                  <button onClick={() => setStep(2)} className="flex-1 bg-white border border-slate-200 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-50">Back</button>
+                                  <button onClick={() => setStep(4)} className="flex-1 bg-teal-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-teal-200">Checkout</button>
                                </div>
                           </div>
                       )}
 
                       {step === 4 && (
-                          <div className="space-y-6 text-center">
-                               <h3 className="text-xl font-bold">Total: {(plans.find(p=>p.id===signupData.plan)?.price as any)?.[signupData.billingPeriod]}</h3>
-                               <p className="text-sm text-slate-500">Plan: {signupData.plan} ({signupData.billingPeriod})</p>
-                               <button onClick={handlePaymentAndSignup} disabled={isProcessingPayment} className="w-full bg-green-600 text-white py-4 rounded-xl font-bold">
-                                   {isProcessingPayment ? 'Processing...' : 'Pay Now'}
+                          <div className="space-y-6 text-center animate-fade-in pt-4">
+                               <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-2">
+                                    <ShieldCheck className="w-10 h-10 text-green-600" />
+                               </div>
+                               <div>
+                                    <h3 className="text-3xl font-black text-slate-800">{(plans.find(p=>p.id===signupData.plan)?.price as any)?.[signupData.billingPeriod]}</h3>
+                                    <p className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-wide">{signupData.plan} Plan • {signupData.billingPeriod}</p>
+                               </div>
+                               
+                               <button onClick={handlePaymentAndSignup} disabled={isProcessingPayment} className="w-full bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-xl font-bold shadow-xl transition-all transform active:scale-[0.98]">
+                                   {isProcessingPayment ? 'Processing Secure Payment...' : 'Complete Payment'}
                                </button>
-                               <button onClick={() => setStep(3)} className="text-slate-400 text-sm">Cancel</button>
+                               <button onClick={() => setStep(3)} className="text-slate-400 text-xs font-bold hover:text-slate-600">Change Plan</button>
                           </div>
                       )}
                   </form>
-                  <div className="mt-6 text-center">
-                    <button onClick={() => setMode('login')} className="text-sm text-slate-400">Back to Login</button>
+                  <div className="absolute bottom-6 left-0 right-0 text-center">
+                    <button onClick={() => setMode('login')} className="text-xs font-bold text-slate-400 hover:text-teal-600 transition-colors">Back to Login Screen</button>
                   </div>
               </div>
           </div>
